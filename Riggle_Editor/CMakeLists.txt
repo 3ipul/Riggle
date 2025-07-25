@@ -1,3 +1,5 @@
+# Riggle_Editor/CMakeLists.txt
+
 # Set ImGui paths
 set(IMGUI_DIR "${CMAKE_SOURCE_DIR}/external/imgui")
 set(IMGUI_SFML_DIR "${CMAKE_SOURCE_DIR}/external/imgui-sfml")
@@ -23,7 +25,13 @@ target_compile_definitions(ImGui-SFML PRIVATE SFML_STATIC)
 # Main application
 add_executable(Riggle_Editor
     src/main.cpp
-    # src/EditorController.cpp
+    src/EditorController.cpp
+    src/AssetManager.cpp
+    src/Render/BoneRenderer.cpp
+    src/Render/SpriteRenderer.cpp
+    src/Panels/AssetBrowserPanel.cpp
+    src/Panels/ScenePanel.cpp
+    src/Panels/SpriteInspectorPanel.cpp
     # src/ToolMode.cpp
     # Add other source files...
 )
