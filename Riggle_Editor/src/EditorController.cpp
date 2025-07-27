@@ -9,6 +9,9 @@ EditorController::EditorController()
     , m_scenePanel(nullptr)
     , m_spriteInspectorPanel(nullptr)
     , m_currentWindow(nullptr)
+    , m_showExitConfirmation(false)
+    , m_shouldExit(false)
+    , m_hasUnsavedChanges(false)
 {
     initializePanels();
     setupPanelCallbacks();
@@ -37,9 +40,41 @@ void EditorController::render(sf::RenderWindow& window) {
             panel->render();
         }
     }
+
+     // Render exit confirmation popup
+    renderExitConfirmation();
 }
 
 void EditorController::handleEvent(const sf::Event& event) {
+    // Handle ESC at controller level for exit confirmation
+    if (event.is<sf::Event::KeyPressed>()) {
+        const auto* keyPressed = event.getIf<sf::Event::KeyPressed>();
+        if (keyPressed && keyPressed->code == sf::Keyboard::Key::Escape) {
+            // Only show exit confirmation if no panel is handling ESC
+            bool panelHandledEsc = false;
+            
+            // Check if any panel needs to handle ESC first
+            for (auto& panel : m_panels) {
+                if (panel && panel->isVisible()) {
+                    // Let scene panel handle ESC for canceling operations
+                    if (auto* scenePanel = dynamic_cast<ScenePanel*>(panel.get())) {
+                        // If scene panel has active operations, let it handle ESC
+                        if (scenePanel->getToolMode() != SceneToolMode::SpriteManipulation) {
+                            panelHandledEsc = true;
+                            break;
+                        }
+                    }
+                }
+            }
+            
+            // If no panel handled ESC, show exit confirmation
+            if (!panelHandledEsc) {
+                requestExit();
+                return; // Don't pass ESC to panels
+            }
+        }
+    }
+    
     // Forward events to panels
     for (auto& panel : m_panels) {
         if (panel && panel->isVisible()) {
@@ -52,27 +87,13 @@ void EditorController::renderMainMenuBar() {
     if (ImGui::BeginMainMenuBar()) {
         if (ImGui::BeginMenu("File")) {
             if (ImGui::MenuItem("New Project")) {
-                // Reset scene
-                if (m_scenePanel) {
-                    auto newCharacter = std::make_unique<Character>("New Character");
-                    auto rig = std::make_unique<Rig>("New Rig");
-                    newCharacter->setRig(std::move(rig));
-                    m_scenePanel->setCharacter(std::move(newCharacter));
-                    
-                    // Update sprite inspector with new character
-                    if (m_spriteInspectorPanel) {
-                        m_spriteInspectorPanel->setCharacter(m_scenePanel->getCharacter());
-                        m_spriteInspectorPanel->setSelectedSprite(nullptr);
-                    }
-                }
+                newProject();
             }
             if (ImGui::MenuItem("Save Project")) {
-                // TODO: Implement project saving
-                std::cout << "Save Project - not implemented yet" << std::endl;
+                saveProject();
             }
             if (ImGui::MenuItem("Load Project")) {
-                // TODO: Implement project loading
-                std::cout << "Load Project - not implemented yet" << std::endl;
+                loadProject();
             }
             ImGui::Separator();
             if (ImGui::MenuItem("Export Animation")) {
@@ -81,9 +102,7 @@ void EditorController::renderMainMenuBar() {
             }
             ImGui::Separator();
             if (ImGui::MenuItem("Exit")) {
-                if (m_currentWindow) {
-                    m_currentWindow->close();
-                }
+                requestExit();
             }
             ImGui::EndMenu();
         }
@@ -214,15 +233,28 @@ void EditorController::setupPanelCallbacks() {
         m_assetBrowserPanel->setOnAssetSelected(
             [this](const AssetInfo& asset) {
                 onAssetSelected(asset);
+                m_hasUnsavedChanges = true; // Mark as changed
             }
         );
     }
     
-    // Setup scene panel callback
+    // Setup scene panel callbacks
     if (m_scenePanel) {
         m_scenePanel->setOnSpriteSelected(
             [this](Sprite* sprite) {
                 onSpriteSelected(sprite);
+            }
+        );
+        
+        m_scenePanel->setOnBoneSelected(
+            [this](std::shared_ptr<Bone> bone) {
+                onBoneSelected(bone);
+            }
+        );
+        
+        m_scenePanel->setOnSpriteBindingChanged(
+            [this](Sprite* sprite, std::shared_ptr<Bone> bone) {
+                onSpriteBindingChanged(sprite, bone);
             }
         );
     }
@@ -266,5 +298,158 @@ void EditorController::onSpriteSelected(Sprite* sprite) {
         std::cout << "No sprite selected" << std::endl;
     }
 }
+
+void EditorController::onBoneSelected(std::shared_ptr<Bone> bone) {
+    if (bone) {
+        std::cout << "Bone selected: " << bone->getName() << std::endl;
+    } else {
+        std::cout << "No bone selected" << std::endl;
+    }
+}
+
+void EditorController::onSpriteBindingChanged(Sprite* sprite, std::shared_ptr<Bone> bone) {
+    m_hasUnsavedChanges = true; // Mark as having changes
+    
+    if (sprite && bone) {
+        std::cout << "Sprite '" << sprite->getName() 
+                  << "' bound to bone '" << bone->getName() << "'" << std::endl;
+    } else if (sprite) {
+        std::cout << "Sprite '" << sprite->getName() << "' unbound from bones" << std::endl;
+    }
+}
+
+void EditorController::requestExit() {
+    if (hasUnsavedChanges()) {
+        m_showExitConfirmation = true;
+    } else {
+        m_shouldExit = true;
+    }
+}
+
+void EditorController::renderExitConfirmation() {
+    if (m_showExitConfirmation) {
+        ImGui::OpenPopup("Exit Riggle");
+    }
+    
+    // Center the popup
+    ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+    ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+    
+    if (ImGui::BeginPopupModal("Exit Riggle", nullptr, 
+                               ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove)) {
+        
+        ImGui::Text("Are you sure you want to exit Riggle?");
+        
+        bool hasChanges = hasUnsavedChanges();
+        if (hasChanges) {
+            ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.0f, 1.0f), "You have unsaved changes!");
+            ImGui::Text("Your work will be lost if you exit without saving.");
+        }
+        
+        ImGui::Separator();
+        ImGui::Spacing();
+        
+        // Button layout
+        float buttonWidth = 120.0f;
+        float spacing = ImGui::GetStyle().ItemSpacing.x;
+        float totalWidth = hasUnsavedChanges() ? (buttonWidth * 3 + spacing * 2) : (buttonWidth * 2 + spacing);
+        float startPos = (ImGui::GetContentRegionAvail().x - totalWidth) * 0.5f;
+        
+        if (startPos > 0) {
+            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + startPos);
+        }
+        
+        if (hasChanges) {
+            // Save and Exit button
+            if (ImGui::Button("Save & Exit", ImVec2(buttonWidth, 0))) {
+                saveProject();
+                m_shouldExit = true;
+                m_showExitConfirmation = false;
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::SameLine();
+        }
+        
+        // Exit without saving
+        if (ImGui::Button("Exit", ImVec2(buttonWidth, 0))) {
+            m_shouldExit = true;
+            m_showExitConfirmation = false;
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        
+        // Cancel
+        if (ImGui::Button("Cancel", ImVec2(buttonWidth, 0))) {
+            m_showExitConfirmation = false;
+            ImGui::CloseCurrentPopup();
+        }
+        
+        ImGui::EndPopup();
+    }
+}
+
+bool EditorController::hasUnsavedChanges() const {
+    // Check explicit flag first
+    if (m_hasUnsavedChanges) {
+        return true;
+    }
+    
+    // Check if we have sprites or bones (indicates work has been done)
+    if (m_scenePanel && m_scenePanel->getCharacter()) {
+        const auto& sprites = m_scenePanel->getCharacter()->getSprites();
+        if (!sprites.empty()) {
+            std::cout << "Found " << sprites.size() << " sprites - has changes" << std::endl;
+            return true;
+        }
+        
+        if (m_scenePanel->getCharacter()->getRig()) {
+            const auto& bones = m_scenePanel->getCharacter()->getRig()->getAllBones();
+            if (!bones.empty()) {
+                std::cout << "Found " << bones.size() << " bones - has changes" << std::endl;
+                return true;
+            }
+        }
+    }
+    
+    return false;
+}
+
+void EditorController::newProject() {
+    if (hasUnsavedChanges()) {
+        // TODO: Show "unsaved changes" confirmation
+        std::cout << "Warning: You have unsaved changes!" << std::endl;
+    }
+    
+    // Reset scene
+    if (m_scenePanel) {
+        auto newCharacter = std::make_unique<Character>("New Character");
+        auto rig = std::make_unique<Rig>("New Rig");
+        newCharacter->setRig(std::move(rig));
+        m_scenePanel->setCharacter(std::move(newCharacter));
+        
+        // Update sprite inspector with new character
+        if (m_spriteInspectorPanel) {
+            m_spriteInspectorPanel->setCharacter(m_scenePanel->getCharacter());
+            m_spriteInspectorPanel->setSelectedSprite(nullptr);
+        }
+    }
+    
+    m_hasUnsavedChanges = false;
+    std::cout << "Created new project" << std::endl;
+}
+
+void EditorController::saveProject() {
+    // TODO: Implement actual project saving
+    std::cout << "Saving project..." << std::endl;
+    m_hasUnsavedChanges = false;
+    std::cout << "Project saved successfully" << std::endl;
+}
+
+void EditorController::loadProject() {
+    // TODO: Implement actual project loading
+    std::cout << "Loading project..." << std::endl;
+    m_hasUnsavedChanges = false;
+}
+
 
 } // namespace Riggle

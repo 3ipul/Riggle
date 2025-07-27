@@ -48,4 +48,13 @@ struct Transform {
         : x(x), y(y), rotation(rotation), scaleX(scaleX), scaleY(scaleY), length(length) {}
 };
 
+// Simple Vertex struct for sprite deformation
+struct Vertex {
+    float x = 0.0f;
+    float y = 0.0f;
+    
+    Vertex() = default;
+    Vertex(float x, float y) : x(x), y(y) {}
+};
+
 } // namespace Riggle

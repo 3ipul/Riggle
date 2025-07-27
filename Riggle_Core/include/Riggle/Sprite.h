@@ -1,19 +1,22 @@
 #pragma once
-#include "Math.h"  // Include the common Transform and Vertex
-#include <string>
+
+#include "Math.h"
 #include <vector>
+#include <string>
+#include <memory>
 
 namespace Riggle {
 
 class Bone;
 
-// Simple Vertex struct for sprite deformation
-struct Vertex {
-    float x = 0.0f;
-    float y = 0.0f;
+struct BoneBinding {
+    std::shared_ptr<Bone> bone;
+    float weight;           // 0.0 to 1.0
+    Vector2 bindOffset;     // Offset from bone when binding
+    float bindRotation;     // Bone's rotation when bound (to calculate relative rotation)
     
-    Vertex() = default;
-    Vertex(float x, float y) : x(x), y(y) {}
+    BoneBinding(std::shared_ptr<Bone> b, float w = 1.0f) 
+        : bone(b), weight(w), bindOffset(0.0f, 0.0f), bindRotation(0.0f) {}
 };
 
 class Sprite {
@@ -23,36 +26,59 @@ public:
 
     // Basic properties
     const std::string& getName() const { return m_name; }
+    void setName(const std::string& name) { m_name = name; }
     const std::string& getTexturePath() const { return m_texturePath; }
+    void setTexturePath(const std::string& path) { m_texturePath = path; }
+
+    // Transform
+    Transform getLocalTransform() const { return m_localTransform; }
+    void setLocalTransform(const Transform& transform) { m_localTransform = transform; }
+    void setTransform(const Transform& transform) { setLocalTransform(transform); }
     
-    // Transform management
-    void setTransform(const Transform& transform) { m_transform = transform; }
-    const Transform& getLocalTransform() const { return m_transform; }
+    // Vertices
+    const std::vector<Vertex>& getOriginalVertices() const { return m_originalVertices; }
+    const std::vector<Vertex>& getDeformedVertices() const { return m_deformedVertices; }
+    void setVertices(const std::vector<Vertex>& vertices);
+    void setupAsQuad(float width, float height, const Vector2& pivot = Vector2(0.5f, 0.5f));
+
+    // CLEAN BONE BINDING SYSTEM (no legacy)
+    void bindToBone(std::shared_ptr<Bone> bone, float weight = 1.0f);
+    void unbindFromBone(std::shared_ptr<Bone> bone);
+    void clearAllBindings();
+    
+    // Check bindings
+    bool isBoundToBones() const { return !m_boneBindings.empty(); }
+    const std::vector<BoneBinding>& getBoneBindings() const { return m_boneBindings; }
+    std::shared_ptr<Bone> getPrimaryBone() const; // Highest weight bone
+    
+    // Deformation
     Transform getWorldTransform() const;
+    void updateDeformation();
     
-    // Vertex management (for deformation)
-    void setVertices(const std::vector<Vertex>& vertices) { m_vertices = vertices; }
-    const std::vector<Vertex>& getVertices() const { return m_vertices; }
-    std::vector<Vertex> getDeformedVertices() const;
-    
-    // Setup helpers
-    void setupAsQuad(float width, float height);
-    
-    // Bone attachment (for animation)
-    void attachToBone(Bone* bone) { m_attachedBone = bone; }
-    void detachFromBone() { m_attachedBone = nullptr; }
-    Bone* getAttachedBone() const { return m_attachedBone; }
-    bool isAttachedToBone() const { return m_attachedBone != nullptr; }
+    // Visibility
+    bool isVisible() const { return m_isVisible; }
+    void setVisible(bool visible) { m_isVisible = visible; }
 
 private:
     std::string m_name;
     std::string m_texturePath;
-    Transform m_transform;
-    std::vector<Vertex> m_vertices;
-    Bone* m_attachedBone;
+    
+    Transform m_localTransform;
+    
+    std::vector<Vertex> m_originalVertices;
+    std::vector<Vertex> m_deformedVertices;
+    
+    // ONLY multi-bone binding system
+    std::vector<BoneBinding> m_boneBindings;
+    
+    bool m_isVisible;
     
     // Helper functions
-    Vertex transformVertex(const Vertex& vertex, const Transform& transform) const;
+    void applyBoneDeformation();
+    void normalizeWeights();
+    Vector2 getCurrentCenterPosition() const;
+    void calculateBindOffset(BoneBinding& binding);
 };
+// ...existing code...
 
 } // namespace Riggle

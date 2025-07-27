@@ -88,9 +88,7 @@ void SpriteInspectorPanel::update(sf::RenderWindow& window) {
 }
 
 void SpriteInspectorPanel::handleEvent(const sf::Event& event) {
-    // Since SFML 3.0 event handling varies, let's use a simpler approach
-    // We'll handle keyboard input primarily in the update() method using isKeyPressed()
-    // This is more reliable across different SFML versions
+    // Use keyboard polling in update() method instead
 }
 
 void SpriteInspectorPanel::renderSpriteList() {
@@ -114,6 +112,12 @@ void SpriteInspectorPanel::renderSpriteList() {
             Transform transform = sprite->getLocalTransform();
             displayName += " (" + std::to_string((int)transform.x) + ", " + std::to_string((int)transform.y) + ")";
             
+            // FIXED: Add binding indicator to display name (NO LEGACY)
+            if (sprite->isBoundToBones()) {
+                const auto& bindings = sprite->getBoneBindings();
+                displayName += " [" + std::to_string(bindings.size()) + " bones]";
+            }
+            
             if (ImGui::Selectable(displayName.c_str(), isSelected)) {
                 m_selectedSprite = sprite.get();
                 if (m_onSpriteSelected) {
@@ -122,7 +126,7 @@ void SpriteInspectorPanel::renderSpriteList() {
                 std::cout << "Selected sprite from list: " << sprite->getName() << std::endl;
             }
             
-            // Tooltip with more info
+            // Enhanced tooltip with binding info
             if (ImGui::IsItemHovered()) {
                 ImGui::BeginTooltip();
                 ImGui::Text("Name: %s", sprite->getName().c_str());
@@ -130,6 +134,22 @@ void SpriteInspectorPanel::renderSpriteList() {
                 ImGui::Text("Position: (%.1f, %.1f)", transform.x, transform.y);
                 ImGui::Text("Rotation: %.1f°", transform.rotation * 180.0f / 3.14159f);
                 ImGui::Text("Scale: (%.2f, %.2f)", transform.scaleX, transform.scaleY);
+                
+                // FIXED: Show binding information in tooltip (NO LEGACY)
+                if (sprite->isBoundToBones()) {
+                    const auto& bindings = sprite->getBoneBindings();
+                    ImGui::Separator();
+                    ImGui::Text("Bound to %zu bones:", bindings.size());
+                    for (const auto& binding : bindings) {
+                        ImGui::Text("- %s (%.2f)", 
+                                   binding.bone->getName().c_str(), 
+                                   binding.weight);
+                    }
+                } else {
+                    ImGui::Separator();
+                    ImGui::Text("No bone bindings");
+                }
+                
                 ImGui::EndTooltip();
             }
         }
@@ -271,16 +291,80 @@ void SpriteInspectorPanel::renderSpriteProperties() {
     ImGui::Text("Name: %s", m_selectedSprite->getName().c_str());
     ImGui::Text("Texture Path: %s", m_selectedSprite->getTexturePath().c_str());
     
-    // Bone attachment info
-    if (m_selectedSprite->isAttachedToBone()) {
-        ImGui::Text("Attached to Bone: %s", m_selectedSprite->getAttachedBone()->getName().c_str());
-        if (ImGui::Button("Detach from Bone")) {
-            m_selectedSprite->detachFromBone();
-            std::cout << "Detached sprite from bone" << std::endl;
+    // FIXED: Updated bone binding info using correct method names (NO LEGACY)
+    ImGui::Separator();
+    ImGui::Text("Bone Bindings:");
+    
+    if (m_selectedSprite->isBoundToBones()) {
+        // Show multiple bone bindings
+        const auto& bindings = m_selectedSprite->getBoneBindings();
+        ImGui::Text("Current bindings (%zu):", bindings.size());
+        
+        for (size_t i = 0; i < bindings.size(); ++i) {
+            const auto& binding = bindings[i];
+            ImGui::Text("- %s (weight: %.2f)", 
+                       binding.bone->getName().c_str(), 
+                       binding.weight);
+            
+            // Add individual unbind buttons
+            ImGui::SameLine();
+            std::string unbindLabel = "Unbind##" + std::to_string(i);
+            if (ImGui::Button(unbindLabel.c_str())) {
+                m_selectedSprite->unbindFromBone(binding.bone);
+                std::cout << "Unbound sprite from bone: " << binding.bone->getName() << std::endl;
+            }
+        }
+        
+        // Clear all bindings button
+        if (ImGui::Button("Clear All Bindings")) {
+            m_selectedSprite->clearAllBindings();
+            std::cout << "Cleared all bindings from sprite" << std::endl;
         }
     } else {
-        ImGui::Text("Not attached to any bone");
+        ImGui::Text("No bone bindings");
+        ImGui::Text("Use Binding Mode (Tool 5) to bind to bones");
     }
+    
+    // Quick binding section
+    ImGui::Separator();
+    ImGui::Text("Quick Binding:");
+    
+    if (m_character && m_character->getRig()) {
+        const auto& bones = m_character->getRig()->getAllBones();
+        if (!bones.empty()) {
+            ImGui::Text("Bind to bone:");
+            
+            // Create a combo box for bone selection
+            static int selectedBoneIndex = -1;
+            std::vector<const char*> boneNames;
+            boneNames.push_back("Select bone...");
+            
+            for (const auto& bone : bones) {
+                boneNames.push_back(bone->getName().c_str());
+            }
+            
+            if (ImGui::Combo("##BoneSelect", &selectedBoneIndex, boneNames.data(), boneNames.size())) {
+                if (selectedBoneIndex > 0 && selectedBoneIndex <= (int)bones.size()) {
+                    // Bind to selected bone
+                    auto selectedBone = bones[selectedBoneIndex - 1];
+                    m_selectedSprite->bindToBone(selectedBone, 1.0f);
+                    std::cout << "Bound sprite to bone: " << selectedBone->getName() << std::endl;
+                    selectedBoneIndex = -1; // Reset selection
+                }
+            }
+        } else {
+            ImGui::Text("No bones available");
+            ImGui::Text("Create bones in scene first");
+        }
+    }
+    
+    // Transform properties (read-only for now)
+    ImGui::Separator();
+    ImGui::Text("Transform (World):");
+    Transform worldTransform = m_selectedSprite->getWorldTransform();
+    ImGui::Text("Position: (%.1f, %.1f)", worldTransform.x, worldTransform.y);
+    ImGui::Text("Rotation: %.1f°", worldTransform.rotation * 180.0f / 3.14159f);
+    ImGui::Text("Scale: (%.2f, %.2f)", worldTransform.scaleX, worldTransform.scaleY);
     
     // Layer controls (for future implementation)
     ImGui::Spacing();

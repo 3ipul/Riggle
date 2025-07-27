@@ -4,13 +4,15 @@
 #include <SFML/System/Clock.hpp>
 #include <SFML/Window/Event.hpp>
 #include <SFML/Window/Keyboard.hpp>
-#include "Editor/EditorController.h"
+#include <Editor/EditorController.h>
+#include <iostream>
 
 int main() {
-    sf::RenderWindow window(sf::VideoMode({1200u, 800u}), "Riggle - 2D Skeletal Animation Tool");
+    sf::RenderWindow window(sf::VideoMode::getDesktopMode(), "Riggle - 2D Skeletal Animation Tool", sf::State::Fullscreen);
     window.setFramerateLimit(60);
-    
+
     if (!ImGui::SFML::Init(window)) {
+        std::cerr << "Failed to initialize ImGui-SFML" << std::endl;
         return -1;
     }
 
@@ -23,11 +25,9 @@ int main() {
         while (const std::optional<sf::Event> event = window.pollEvent()) {
             ImGui::SFML::ProcessEvent(window, *event);
             
-            // Window closed or escape key pressed: exit
-            if (event->is<sf::Event::Closed>() ||
-                (event->is<sf::Event::KeyPressed>() &&
-                 event->getIf<sf::Event::KeyPressed>()->code == sf::Keyboard::Key::Escape)) {
-                window.close();
+            // Window closed: request exit through editor
+            if (event->is<sf::Event::Closed>()) {
+                editor.requestExit();
             }
             
             // Pass events to editor
@@ -38,6 +38,12 @@ int main() {
         
         // Update editor
         editor.update(window);
+
+        // Check if editor wants to exit
+        if (editor.shouldExit()) {
+            window.close();
+            break;
+        }
 
         // Clear and render
         window.clear(sf::Color::Black);
@@ -51,6 +57,7 @@ int main() {
         window.display();
     }
 
+    std::cout << "Riggle Editor shutting down ..." << std::endl;
     ImGui::SFML::Shutdown();
     return 0;
 }
