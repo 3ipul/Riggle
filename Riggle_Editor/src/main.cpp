@@ -8,7 +8,7 @@
 #include <iostream>
 
 int main() {
-    sf::RenderWindow window(sf::VideoMode::getDesktopMode(), "Riggle - 2D Skeletal Animation Tool", sf::State::Fullscreen);
+    sf::RenderWindow window(sf::VideoMode::getDesktopMode(), "Riggle - 2D Skeletal Animation Tool");
     window.setFramerateLimit(60);
 
     if (!ImGui::SFML::Init(window)) {

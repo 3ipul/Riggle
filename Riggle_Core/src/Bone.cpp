@@ -117,4 +117,15 @@ void Bone::updateWorldTransform() const {
     m_worldTransformDirty = false;
 }
 
+void Bone::markWorldTransformDirty() {
+    m_worldTransformDirty = true;
+    
+    // Mark all children as dirty too
+    for (auto& child : m_children) {
+        if (child) {
+            child->markWorldTransformDirty();
+        }
+    }
+}
+
 } // namespace Riggle

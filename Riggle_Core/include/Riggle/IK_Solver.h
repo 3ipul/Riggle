@@ -67,6 +67,9 @@ private:
     static float angleBetweenVectors(const Vector2& a, const Vector2& b);
     static float clampAngle(float angle, float minAngle, float maxAngle);
     static float normalizeAngle(float angle);
+
+    // Force update all children transforms
+    static void IK_Solver::forceUpdateChildrenTransforms(std::shared_ptr<Bone> bone);
     
     // Constraint system
     static std::map<std::shared_ptr<Bone>, IKConstraints> s_boneConstraints;

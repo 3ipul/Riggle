@@ -143,6 +143,14 @@ void BoneCreationTool::handleMouseMove(const sf::Vector2f& worldPos) {
                 Transform newTransform = m_rotatingBone->getLocalTransform();
                 newTransform.rotation = m_rotationPreview;
                 m_rotatingBone->setLocalTransform(newTransform);
+
+                // Force update all children
+                m_rotatingBone->markWorldTransformDirty();
+                
+                // Force update entire rig
+                if (m_rig) {
+                    m_rig->forceUpdateWorldTransforms();
+                }
                 
                 // Trigger callback for real-time updates
                 if (m_onBoneRotated) {

@@ -29,6 +29,9 @@ public:
     // World positions for rendering
     void getWorldEndpoints(float& startX, float& startY, float& endX, float& endY) const;
 
+    // Force mark world transform as dirty
+    void markWorldTransformDirty();
+
 private:
     void updateWorldTransform() const;
     

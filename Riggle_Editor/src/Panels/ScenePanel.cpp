@@ -29,6 +29,9 @@ ScenePanel::ScenePanel()
     , m_showSprites(true)
     , m_showGrid(true)
     , m_showBindings(true)
+    , m_ikMode(false)
+    , m_ikTarget(nullptr)
+    , m_ikDragging(false)
 {
     // Initialize view
     m_view.setSize(sf::Vector2f(800.0f, 600.0f));
@@ -744,7 +747,7 @@ void ScenePanel::render() {
         "Bone Creation", 
         "Bone Selection", 
         "Bone Rotation (FK)",
-        "Sprite Binding"
+        "Sprite Binding",
         "IK Solver"
     };
     ImGui::Text("Tool: %s", toolModeNames[(int)m_toolMode]);
@@ -1209,52 +1212,99 @@ void ScenePanel::showBoneContextMenu(std::shared_ptr<Bone> bone, const sf::Vecto
 }
 
 void ScenePanel::handleIKInteraction(const sf::Vector2f& worldPos) {
-    if (!m_character || !m_character->getRig()) return;
+    if (!m_character || !m_character->getRig()) {
+        std::cout << "IK: No character or rig available" << std::endl;
+        return;
+    }
     
-    if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {  // FIXED: Use ImGui mouse detection
+    // Left mouse click - select IK target
+    if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
         if (!m_ikDragging) {
-            // Select end effector bone
+            std::cout << "IK: Searching for bone near position (" << worldPos.x << ", " << worldPos.y << ")" << std::endl;
+            
+            // Find closest bone end
             const auto& bones = m_character->getRig()->getAllBones();
+            std::shared_ptr<Bone> closestBone = nullptr;
+            float closestDistance = 20.0f; // 20 pixel threshold
+            
             for (const auto& bone : bones) {
-                float startX, startY, endX, endY;
-                bone->getWorldEndpoints(startX, startY, endX, endY);
+                if (!bone) continue;
                 
-                // Check if clicking near bone end (for end effector selection)
-                float distToEnd = std::sqrt((worldPos.x - endX) * (worldPos.x - endX) + 
-                                          (worldPos.y - endY) * (worldPos.y - endY));
-                
-                if (distToEnd < 15.0f) {
-                    m_ikTarget = bone;
-                    m_ikTargetPos = worldPos;
-                    m_ikDragging = true;
-                    std::cout << "Selected IK target: " << bone->getName() << std::endl;
-                    break;
+                try {
+                    float startX, startY, endX, endY;
+                    bone->getWorldEndpoints(startX, startY, endX, endY);
+                    
+                    // Check distance to bone end
+                    float dx = worldPos.x - endX;
+                    float dy = worldPos.y - endY;
+                    float distance = std::sqrt(dx * dx + dy * dy);
+                    
+                    if (distance < closestDistance) {
+                        closestDistance = distance;
+                        closestBone = bone;
+                    }
+                } catch (const std::exception& e) {
+                    std::cout << "IK Error checking bone '" << bone->getName() << "': " << e.what() << std::endl;
+                    continue;
                 }
             }
-        }
-    }
-    
-    if (ImGui::IsMouseDown(ImGuiMouseButton_Left) && m_ikDragging) {  // FIXED: Separate dragging logic
-        // Update target position and solve IK
-        m_ikTargetPos = worldPos;
-        
-        if (m_ikTarget) {
-            IKSolverSettings settings;
-            settings.maxIterations = 10;
-            settings.tolerance = 5.0f;
-            settings.dampening = 0.7f;
             
-            Vector2 target(m_ikTargetPos.x, m_ikTargetPos.y);
-            bool success = IK_Solver::solveCCD(m_ikTarget, target, settings);
-            
-            // Force character deformation update
-            if (m_character) {
-                m_character->forceUpdateDeformations();
+            if (closestBone) {
+                m_ikTarget = closestBone;
+                m_ikTargetPos = worldPos;
+                m_ikDragging = true;
+                std::cout << "IK: Selected target bone '" << closestBone->getName() << "'" << std::endl;
+            } else {
+                std::cout << "IK: No bone found near click position" << std::endl;
             }
         }
     }
     
-    if (ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {  // FIXED: Proper mouse release
+    // Mouse drag - solve IK
+    if (ImGui::IsMouseDown(ImGuiMouseButton_Left) && m_ikDragging && m_ikTarget) {
+        m_ikTargetPos = worldPos;
+        
+        try {
+            // Use very conservative settings
+            IKSolverSettings settings;
+            settings.maxIterations = 3;    // Very low for safety
+            settings.tolerance = 20.0f;    // Very forgiving
+            settings.dampening = 0.2f;     // Very conservative
+            
+            Vector2 target(m_ikTargetPos.x, m_ikTargetPos.y);
+            
+            std::cout << "IK: Solving to position (" << target.x << ", " << target.y << ")" << std::endl;
+            
+            bool success = IK_Solver::solveCCD(m_ikTarget, target, settings);
+            
+            if (success) {
+                std::cout << "IK: Solve successful" << std::endl;
+            } else {
+                std::cout << "IK: Solve failed" << std::endl;
+            }
+            
+            // Force update sprite deformations
+            if (m_character) {
+                const auto& sprites = m_character->getSprites();
+                for (auto& sprite : sprites) {
+                    if (sprite) {
+                        sprite->updateDeformation();
+                    }
+                }
+            }
+            
+        } catch (const std::exception& e) {
+            std::cout << "IK Solve Error: " << e.what() << std::endl;
+            m_ikDragging = false;
+            m_ikTarget = nullptr;
+        }
+    }
+    
+    // Mouse release - stop IK
+    if (ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
+        if (m_ikDragging) {
+            std::cout << "IK: Finished dragging" << std::endl;
+        }
         m_ikDragging = false;
     }
 }
