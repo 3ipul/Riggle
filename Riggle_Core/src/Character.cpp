@@ -47,6 +47,51 @@ void Character::setRig(std::unique_ptr<Rig> rig) {
     }
 }
 
+void Character::addAnimation(std::unique_ptr<Animation> animation) {
+    if (animation) {
+        m_animations.push_back(std::move(animation));
+    }
+}
+
+void Character::removeAnimation(const std::string& name) {
+    m_animations.erase(
+        std::remove_if(m_animations.begin(), m_animations.end(),
+            [&name](const std::unique_ptr<Animation>& anim) {
+                return anim && anim->getName() == name;
+            }),
+        m_animations.end()
+    );
+}
+
+Animation* Character::findAnimation(const std::string& name) {
+    for (auto& animation : m_animations) {
+        if (animation && animation->getName() == name) {
+            return animation.get();
+        }
+    }
+    return nullptr;
+}
+
+void Character::update(float deltaTime) {
+    // Don't update animations during manual bone editing
+    if (m_manualBoneEditMode) {
+        return;
+    }
+
+    // Update animation player
+    m_animationPlayer.update(deltaTime);
+    
+    // Apply animation to rig
+    if (m_rig) {
+        m_animationPlayer.applyToRig(m_rig.get());
+    }
+    
+    // Update deformations if auto-update is enabled
+    if (m_autoUpdate) {
+        updateDeformations();
+    }
+}
+
 void Character::updateDeformations() {
     if (!m_rig) return;
     

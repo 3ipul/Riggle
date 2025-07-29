@@ -1,6 +1,8 @@
 #pragma once
+
 #include "Sprite.h"
 #include "Rig.h"
+#include "Animation.h"
 #include <vector>
 #include <memory>
 #include <string>
@@ -26,6 +28,19 @@ public:
     void setRig(std::unique_ptr<Rig> rig);
     Rig* getRig() const { return m_rig.get(); }
 
+     // Animation management
+    void addAnimation(std::unique_ptr<Animation> animation);
+    void removeAnimation(const std::string& name);
+    Animation* findAnimation(const std::string& name);
+    const std::vector<std::unique_ptr<Animation>>& getAnimations() const { return m_animations; }
+    
+    // Animation playback
+    AnimationPlayer* getAnimationPlayer() { return &m_animationPlayer; }
+    const AnimationPlayer* getAnimationPlayer() const { return &m_animationPlayer; }
+    
+    // Update system
+    void update(float deltaTime);
+
     // Deformation - CRITICAL for FK/IK
     void updateDeformations();
     void forceUpdateDeformations(); // Force immediate update
@@ -34,11 +49,17 @@ public:
     void setAutoUpdate(bool autoUpdate) { m_autoUpdate = autoUpdate; }
     bool getAutoUpdate() const { return m_autoUpdate; }
 
+    void setManualBoneEditMode(bool enabled) { m_manualBoneEditMode = enabled; }
+    bool isInManualBoneEditMode() const { return m_manualBoneEditMode; }
+
 private:
     std::string m_name;
     std::vector<std::unique_ptr<Sprite>> m_sprites;
     std::unique_ptr<Rig> m_rig;
-    bool m_autoUpdate = true; // NEW: Auto-update deformations
+    std::vector<std::unique_ptr<Animation>> m_animations;
+    AnimationPlayer m_animationPlayer;
+    bool m_autoUpdate = true; // Auto-update deformations
+    bool m_manualBoneEditMode = false;
 };
 
 } // namespace Riggle

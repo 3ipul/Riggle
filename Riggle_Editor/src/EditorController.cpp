@@ -20,6 +20,11 @@ EditorController::EditorController()
 void EditorController::update(sf::RenderWindow& window) {
     m_currentWindow = &window;
     
+    // Update character animation - ADD THIS
+    if (m_scenePanel && m_scenePanel->getCharacter()) {
+        m_scenePanel->getCharacter()->update(ImGui::GetIO().DeltaTime);
+    }
+
     // Update all panels
     for (auto& panel : m_panels) {
         if (panel && panel->isVisible()) {
@@ -223,6 +228,11 @@ void EditorController::initializePanels() {
     auto spriteInspector = std::make_unique<SpriteInspectorPanel>();
     m_spriteInspectorPanel = spriteInspector.get();
     m_panels.push_back(std::move(spriteInspector));
+
+    // Animation panel
+    auto animationPanel = std::make_unique<AnimationPanel>();
+    m_animationPanel = animationPanel.get();
+    m_panels.push_back(std::move(animationPanel));
     
     std::cout << "Initialized " << m_panels.size() << " panels" << std::endl;
 }
@@ -271,6 +281,26 @@ void EditorController::setupPanelCallbacks() {
     // Connect sprite inspector to scene panel's character
     if (m_scenePanel && m_spriteInspectorPanel) {
         m_spriteInspectorPanel->setCharacter(m_scenePanel->getCharacter());
+    }
+
+    // Set character reference for animation panel
+    if (m_scenePanel && m_animationPanel) {
+        m_animationPanel->setCharacter(m_scenePanel->getCharacter());
+        
+        // Connect animation recording to scene changes
+        m_scenePanel->setOnBoneRotated([this](std::shared_ptr<Bone> bone, float rotation) {
+            // When recording and bone is rotated, add keyframe
+            if (m_animationPanel->isRecording()) {
+                auto* player = m_scenePanel->getCharacter()->getAnimationPlayer();
+                auto* currentAnim = player->getAnimation();
+                if (currentAnim && bone) {
+                    float currentTime = m_animationPanel->getCurrentTime();
+                    Transform transform = bone->getLocalTransform();
+                    currentAnim->addKeyframe(bone->getName(), currentTime, transform);
+                    std::cout << "Auto-recorded keyframe for " << bone->getName() << " at time " << currentTime << std::endl;
+                }
+            }
+        });
     }
     
     std::cout << "Panel callbacks setup complete" << std::endl;

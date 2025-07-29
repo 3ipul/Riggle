@@ -4,6 +4,7 @@
 #include "Panels/AssetBrowserPanel.h"
 #include "Panels/ScenePanel.h"
 #include "Panels/SpriteInspectorPanel.h"
+#include "Panels/AnimationPanel.h"
 #include <memory>
 #include <vector>
 
@@ -26,6 +27,7 @@ public:
     ScenePanel* getScenePanel() const { return m_scenePanel; }
     SpriteInspectorPanel* getSpriteInspectorPanel() const { return m_spriteInspectorPanel; }
     AssetBrowserPanel* getAssetBrowserPanel() const { return m_assetBrowserPanel; }
+    AnimationPanel* getAnimationPanel() const { return m_animationPanel; }
 
 private:
     // Panel management
@@ -33,6 +35,7 @@ private:
     AssetBrowserPanel* m_assetBrowserPanel;
     ScenePanel* m_scenePanel;
     SpriteInspectorPanel* m_spriteInspectorPanel;
+    AnimationPanel* m_animationPanel;
     
     // State
     sf::RenderWindow* m_currentWindow;

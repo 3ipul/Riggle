@@ -138,7 +138,6 @@ void ScenePanel::handleEvent(const sf::Event& event) {
                     std::cout << "Switched to IK Solver Mode" << std::endl;
                     break;
                 case sf::Keyboard::Key::Escape:
-                    // FIXED: Only cancel current operations, don't exit application
                     handleEscapeKey();
                     break;
                 default:
@@ -165,7 +164,7 @@ void ScenePanel::handleEscapeKey() {
             std::cout << "Cancelled binding operation" << std::endl;
             operationCancelled = true;
         }
-    } else if (m_toolMode == SceneToolMode::IKSolver) {  // ADD THIS
+    } else if (m_toolMode == SceneToolMode::IKSolver) {
         if (m_ikTarget || m_ikDragging) {
             m_ikTarget = nullptr;
             m_ikDragging = false;
