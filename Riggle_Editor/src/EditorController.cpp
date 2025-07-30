@@ -359,29 +359,22 @@ void EditorController::onAssetSelected(const AssetInfo& asset) {
 void EditorController::onMultipleAssetsSelected(const std::vector<AssetInfo>& assets) {
     if (!m_scenePanel || assets.empty()) return;
     
-    std::cout << "Adding " << assets.size() << " assets to character..." << std::endl;
+    std::cout << "Adding " << assets.size() << " assets to character (using single import method)..." << std::endl;
     
-    // Add each selected asset as a sprite
+    // Simply call onAssetSelected for each asset in the loop
     for (size_t i = 0; i < assets.size(); ++i) {
         const auto& asset = assets[i];
         
-        // Check if it's an image asset (using string type field)
-        if (asset.type == "image") {
-            // Position sprites in a grid to avoid overlap
-            float offsetX = (i % 5) * 120.0f; // 5 sprites per row
-            float offsetY = (i / 5) * 120.0f; // Next row every 5 sprites
-            sf::Vector2f position(offsetX, offsetY);
-            
-            // Use ScenePanel's addSpriteFromAsset method (same as single selection)
-            m_scenePanel->addSpriteFromAsset(asset, position);
-            
-            std::cout << "Added sprite: " << asset.name << " from " << asset.path << std::endl;
-        } else {
-            std::cout << "Skipped non-image asset: " << asset.name << " (type: " << asset.type << ")" << std::endl;
-        }
+        std::cout << "Processing asset " << (i + 1) << "/" << assets.size() << ": " << asset.name << std::endl;
+        
+        // Use the exact same logic as single import
+        onAssetSelected(asset);
+        
+        // Optional: Add tiny delay to see the progression (remove if not needed)
+        // std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
     
-    std::cout << "Successfully processed " << assets.size() << " assets" << std::endl;
+    std::cout << "Successfully processed all " << assets.size() << " assets using single import method" << std::endl;
 }
 
 void EditorController::onSpriteSelected(Sprite* sprite) {
