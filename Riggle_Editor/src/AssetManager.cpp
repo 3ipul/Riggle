@@ -8,6 +8,8 @@ AssetManager::AssetManager() {
 }
 
 void AssetManager::scanDirectory(const std::string& directory) {
+    m_assets.clear();
+
     try {
         if (std::filesystem::exists(directory) && std::filesystem::is_directory(directory)) {
             for (const auto& entry : std::filesystem::recursive_directory_iterator(directory)) {

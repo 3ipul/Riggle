@@ -1,59 +1,44 @@
-#include "Editor/Panels/SpriteInspectorPanel.h"
+#include "Editor/Panels/PropertyPanel.h"
 #include <imgui.h>
-#include <algorithm>
 #include <iostream>
 
 namespace Riggle {
 
-SpriteInspectorPanel::SpriteInspectorPanel()
-    : BasePanel("Sprite Inspector")
+PropertyPanel::PropertyPanel()
+    : BasePanel("Properties")
     , m_character(nullptr)
+    , m_currentType(PropertyType::None)
     , m_selectedSprite(nullptr)
+    , m_selectedBone(nullptr)
     , m_moveStep(10.0f)
     , m_moveStepInt(10)
 {
 }
 
-void SpriteInspectorPanel::render() {
+void PropertyPanel::render() {
     if (!m_isVisible) return;
 
     ImGui::Begin(m_name.c_str(), &m_isVisible);
 
-    if (!m_character) {
-        ImGui::Text("No character loaded");
-        ImGui::End();
-        return;
-    }
-
-    // Sprite list section
-    renderSpriteList();
-    
-    ImGui::Separator();
-    
-    if (m_selectedSprite) {
-        // Transform controls section
-        renderTransformControls();
-        
-        ImGui::Separator();
-        
-        // Movement buttons section
-        renderMovementButtons();
-        
-        ImGui::Separator();
-        
-        // Additional sprite properties
-        renderSpriteProperties();
-    } else {
-        ImGui::Text("No sprite selected");
-        ImGui::Text("Select a sprite from the list above or click in the scene");
+    switch (m_currentType) {
+        case PropertyType::Sprite:
+            renderSpriteProperties();
+            break;
+        case PropertyType::Bone:
+            renderBoneProperties();
+            break;
+        case PropertyType::None:
+        default:
+            renderEmptyState();
+            break;
     }
 
     ImGui::End();
 }
 
-void SpriteInspectorPanel::update(sf::RenderWindow& window) {
+void PropertyPanel::update(sf::RenderWindow& window) {
     // Handle continuous keyboard input for smooth movement
-    if (m_selectedSprite) {
+    if (m_selectedSprite && m_currentType == PropertyType::Sprite) {
         bool moved = false;
         float step = m_moveStep;
         
@@ -87,79 +72,70 @@ void SpriteInspectorPanel::update(sf::RenderWindow& window) {
     }
 }
 
-void SpriteInspectorPanel::handleEvent(const sf::Event& event) {
-    // Use keyboard polling in update() method instead
+void PropertyPanel::setSelectedSprite(Sprite* sprite) {
+    m_selectedSprite = sprite;
+    m_selectedBone = nullptr;
+    m_currentType = sprite ? PropertyType::Sprite : PropertyType::None;
 }
 
-void SpriteInspectorPanel::renderSpriteList() {
-    ImGui::Text("Sprites in Scene (%zu)", m_character->getSprites().size());
-    
-    // Create a list box for sprite selection
-    if (ImGui::BeginListBox("##SpriteList", ImVec2(-1, 150))) {
-        
-        const auto& sprites = m_character->getSprites();
-        for (size_t i = 0; i < sprites.size(); ++i) {
-            const auto& sprite = sprites[i];
-            bool isSelected = (sprite.get() == m_selectedSprite);
-            
-            // Create a selectable item for each sprite
-            std::string displayName = sprite->getName();
-            if (displayName.empty()) {
-                displayName = "Sprite " + std::to_string(i);
-            }
-            
-            // Add position info to the display name
-            Transform transform = sprite->getLocalTransform();
-            displayName += " (" + std::to_string((int)transform.x) + ", " + std::to_string((int)transform.y) + ")";
-            
-            // FIXED: Add binding indicator to display name (NO LEGACY)
-            if (sprite->isBoundToBones()) {
-                const auto& bindings = sprite->getBoneBindings();
-                displayName += " [" + std::to_string(bindings.size()) + " bones]";
-            }
-            
-            if (ImGui::Selectable(displayName.c_str(), isSelected)) {
-                m_selectedSprite = sprite.get();
-                if (m_onSpriteSelected) {
-                    m_onSpriteSelected(m_selectedSprite);
-                }
-                std::cout << "Selected sprite from list: " << sprite->getName() << std::endl;
-            }
-            
-            // Enhanced tooltip with binding info
-            if (ImGui::IsItemHovered()) {
-                ImGui::BeginTooltip();
-                ImGui::Text("Name: %s", sprite->getName().c_str());
-                ImGui::Text("Path: %s", sprite->getTexturePath().c_str());
-                ImGui::Text("Position: (%.1f, %.1f)", transform.x, transform.y);
-                ImGui::Text("Rotation: %.1f°", transform.rotation * 180.0f / 3.14159f);
-                ImGui::Text("Scale: (%.2f, %.2f)", transform.scaleX, transform.scaleY);
-                
-                // FIXED: Show binding information in tooltip (NO LEGACY)
-                if (sprite->isBoundToBones()) {
-                    const auto& bindings = sprite->getBoneBindings();
-                    ImGui::Separator();
-                    ImGui::Text("Bound to %zu bones:", bindings.size());
-                    for (const auto& binding : bindings) {
-                        ImGui::Text("- %s (%.2f)", 
-                                   binding.bone->getName().c_str(), 
-                                   binding.weight);
-                    }
-                } else {
-                    ImGui::Separator();
-                    ImGui::Text("No bone bindings");
-                }
-                
-                ImGui::EndTooltip();
-            }
-        }
-        
-        ImGui::EndListBox();
+void PropertyPanel::setSelectedBone(Bone* bone) {
+    m_selectedBone = bone;
+    m_selectedSprite = nullptr;
+    m_currentType = bone ? PropertyType::Bone : PropertyType::None;
+}
+
+void PropertyPanel::clearSelection() {
+    m_selectedSprite = nullptr;
+    m_selectedBone = nullptr;
+    m_currentType = PropertyType::None;
+}
+
+void PropertyPanel::renderEmptyState() {
+    ImGui::Spacing();
+    ImGui::TextWrapped("No object selected");
+    ImGui::Spacing();
+    ImGui::TextWrapped("Select a sprite from the Assets panel or a bone from the Hierarchy panel to view its properties.");
+}
+
+void PropertyPanel::renderSpriteProperties() {
+    if (!m_selectedSprite) {
+        renderEmptyState();
+        return;
     }
+
+    ImGui::Text("Sprite Properties");
+    ImGui::Separator();
+
+    // Basic info
+    ImGui::Text("Name: %s", m_selectedSprite->getName().c_str());
+    ImGui::Text("Texture: %s", m_selectedSprite->getTexturePath().c_str());
+    
+    ImGui::Spacing();
+    
+    // Transform controls
+    renderTransformControls();
+    
+    ImGui::Separator();
+    
+    // Movement controls
+    renderMovementButtons();
+    
+    ImGui::Separator();
+    
+    // Bone bindings
+    renderSpriteBindings();
 }
 
-void SpriteInspectorPanel::renderTransformControls() {
-    ImGui::Text("Transform Controls");
+void PropertyPanel::renderBoneProperties() {
+    // TODO: Implement bone properties for future Hierarchy panel
+    ImGui::Text("Bone Properties");
+    ImGui::Separator();
+    ImGui::Text("Bone properties will be implemented");
+    ImGui::Text("when the Hierarchy panel is added.");
+}
+
+void PropertyPanel::renderTransformControls() {
+    ImGui::Text("Transform");
     
     if (!m_selectedSprite) return;
     
@@ -210,7 +186,7 @@ void SpriteInspectorPanel::renderTransformControls() {
     }
 }
 
-void SpriteInspectorPanel::renderMovementButtons() {
+void PropertyPanel::renderMovementButtons() {
     ImGui::Text("Precise Movement");
     
     // Movement step control
@@ -265,38 +241,14 @@ void SpriteInspectorPanel::renderMovementButtons() {
     ImGui::Text("Keyboard Shortcuts:");
     ImGui::Text("Arrow Keys / WASD: Move sprite");
     ImGui::Text("Shift + Movement: 5x faster");
-    ImGui::Text("(Hold keys for continuous movement)");
 }
 
-void SpriteInspectorPanel::moveSprite(float deltaX, float deltaY) {
-    if (!m_selectedSprite) return;
-    
-    Transform transform = m_selectedSprite->getLocalTransform();
-    transform.x += deltaX;
-    transform.y += deltaY;
-    m_selectedSprite->setTransform(transform);
-    
-    // Only log for discrete movements (not continuous ones)
-    if (deltaX >= 1.0f || deltaY >= 1.0f || deltaX <= -1.0f || deltaY <= -1.0f) {
-        std::cout << "Moved sprite by (" << deltaX << ", " << deltaY << ") to (" << transform.x << ", " << transform.y << ")" << std::endl;
-    }
-}
-
-void SpriteInspectorPanel::renderSpriteProperties() {
-    ImGui::Text("Sprite Properties");
+void PropertyPanel::renderSpriteBindings() {
+    ImGui::Text("Bone Bindings");
     
     if (!m_selectedSprite) return;
-    
-    // Display read-only information
-    ImGui::Text("Name: %s", m_selectedSprite->getName().c_str());
-    ImGui::Text("Texture Path: %s", m_selectedSprite->getTexturePath().c_str());
-    
-    // FIXED: Updated bone binding info using correct method names (NO LEGACY)
-    ImGui::Separator();
-    ImGui::Text("Bone Bindings:");
     
     if (m_selectedSprite->isBoundToBones()) {
-        // Show multiple bone bindings
         const auto& bindings = m_selectedSprite->getBoneBindings();
         ImGui::Text("Current bindings (%zu):", bindings.size());
         
@@ -306,7 +258,6 @@ void SpriteInspectorPanel::renderSpriteProperties() {
                        binding.bone->getName().c_str(), 
                        binding.weight);
             
-            // Add individual unbind buttons
             ImGui::SameLine();
             std::string unbindLabel = "Unbind##" + std::to_string(i);
             if (ImGui::Button(unbindLabel.c_str())) {
@@ -315,14 +266,13 @@ void SpriteInspectorPanel::renderSpriteProperties() {
             }
         }
         
-        // Clear all bindings button
         if (ImGui::Button("Clear All Bindings")) {
             m_selectedSprite->clearAllBindings();
             std::cout << "Cleared all bindings from sprite" << std::endl;
         }
     } else {
         ImGui::Text("No bone bindings");
-        ImGui::Text("Use Binding Mode (Tool 5) to bind to bones");
+        ImGui::Text("Use Binding Mode to bind to bones");
     }
     
     // Quick binding section
@@ -332,9 +282,6 @@ void SpriteInspectorPanel::renderSpriteProperties() {
     if (m_character && m_character->getRig()) {
         const auto& bones = m_character->getRig()->getAllBones();
         if (!bones.empty()) {
-            ImGui::Text("Bind to bone:");
-            
-            // Create a combo box for bone selection
             static int selectedBoneIndex = -1;
             std::vector<const char*> boneNames;
             boneNames.push_back("Select bone...");
@@ -345,48 +292,25 @@ void SpriteInspectorPanel::renderSpriteProperties() {
             
             if (ImGui::Combo("##BoneSelect", &selectedBoneIndex, boneNames.data(), boneNames.size())) {
                 if (selectedBoneIndex > 0 && selectedBoneIndex <= (int)bones.size()) {
-                    // Bind to selected bone
                     auto selectedBone = bones[selectedBoneIndex - 1];
                     m_selectedSprite->bindToBone(selectedBone, 1.0f);
                     std::cout << "Bound sprite to bone: " << selectedBone->getName() << std::endl;
-                    selectedBoneIndex = -1; // Reset selection
+                    selectedBoneIndex = -1;
                 }
             }
         } else {
             ImGui::Text("No bones available");
-            ImGui::Text("Create bones in scene first");
         }
     }
+}
+
+void PropertyPanel::moveSprite(float deltaX, float deltaY) {
+    if (!m_selectedSprite) return;
     
-    // Transform properties (read-only for now)
-    ImGui::Separator();
-    ImGui::Text("Transform (World):");
-    Transform worldTransform = m_selectedSprite->getWorldTransform();
-    ImGui::Text("Position: (%.1f, %.1f)", worldTransform.x, worldTransform.y);
-    ImGui::Text("Rotation: %.1f°", worldTransform.rotation * 180.0f / 3.14159f);
-    ImGui::Text("Scale: (%.2f, %.2f)", worldTransform.scaleX, worldTransform.scaleY);
-    
-    // Layer controls (for future implementation)
-    ImGui::Spacing();
-    ImGui::Text("Layer Controls (Future):");
-    if (ImGui::Button("Move to Front")) {
-        // TODO: Implement layer reordering
-        std::cout << "Move to front - not implemented yet" << std::endl;
-    }
-    ImGui::SameLine();
-    if (ImGui::Button("Move to Back")) {
-        // TODO: Implement layer reordering
-        std::cout << "Move to back - not implemented yet" << std::endl;
-    }
-    
-    // Delete sprite button
-    ImGui::Spacing();
-    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.8f, 0.2f, 0.2f, 1.0f));
-    if (ImGui::Button("Delete Sprite")) {
-        // TODO: Implement sprite deletion
-        std::cout << "Delete sprite - not implemented yet" << std::endl;
-    }
-    ImGui::PopStyleColor();
+    Transform transform = m_selectedSprite->getLocalTransform();
+    transform.x += deltaX;
+    transform.y += deltaY;
+    m_selectedSprite->setTransform(transform);
 }
 
 } // namespace Riggle

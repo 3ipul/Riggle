@@ -25,14 +25,16 @@ target_compile_definitions(ImGui-SFML PRIVATE SFML_STATIC)
 # Main application
 add_executable(Riggle_Editor
     src/main.cpp
+    src/EditorApplication.cpp
     src/EditorController.cpp
     src/AssetManager.cpp
     src/Render/BoneRenderer.cpp
     src/Render/SpriteRenderer.cpp
+    src/Panels/AssetPanel.cpp
     src/Panels/AssetBrowserPanel.cpp
+    src/Panels/PropertyPanel.cpp
     src/Panels/ScenePanel.cpp
     src/Panels/AnimationPanel.cpp
-    src/Panels/SpriteInspectorPanel.cpp
     src/Tools/BoneCreationTool.cpp
     # src/ToolMode.cpp
     # Add other source files...

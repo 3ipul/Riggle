@@ -31,6 +31,34 @@ void Character::removeSprite(const std::string& name) {
     }
 }
 
+void Character::removeSprite(Sprite* sprite) {
+    if (!sprite) return;
+    
+    auto it = std::remove_if(m_sprites.begin(), m_sprites.end(),
+        [sprite](const std::unique_ptr<Sprite>& spr) {
+            return spr.get() == sprite;
+        });
+    
+    if (it != m_sprites.end()) {
+        m_sprites.erase(it, m_sprites.end());
+        if (m_autoUpdate) {
+            updateDeformations();
+        }
+        std::cout << "Removed sprite: " << sprite->getName() << std::endl;
+    }
+}
+
+void Character::removeSpriteAt(size_t index) {
+    if (index < m_sprites.size()) {
+        std::string name = m_sprites[index]->getName();
+        m_sprites.erase(m_sprites.begin() + index);
+        if (m_autoUpdate) {
+            updateDeformations();
+        }
+        std::cout << "Removed sprite at index " << index << ": " << name << std::endl;
+    }
+}
+
 Sprite* Character::findSprite(const std::string& name) {
     auto it = std::find_if(m_sprites.begin(), m_sprites.end(),
         [&name](const std::unique_ptr<Sprite>& sprite) {

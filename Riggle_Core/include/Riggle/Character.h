@@ -22,7 +22,12 @@ public:
     void addSprite(std::unique_ptr<Sprite> sprite);
     void removeSprite(const std::string& name);
     Sprite* findSprite(const std::string& name);
+    void removeSprite(Sprite* sprite); // Remove by pointer
+    void removeSpriteAt(size_t index); // Remove by index
     const std::vector<std::unique_ptr<Sprite>>& getSprites() const { return m_sprites; }
+
+    // Non-const access for reordering
+    std::vector<std::unique_ptr<Sprite>>& getSprites() { return m_sprites; }
 
     // Rig management
     void setRig(std::unique_ptr<Rig> rig);

@@ -6,8 +6,9 @@ namespace Riggle {
 
 EditorController::EditorController() 
     : m_assetBrowserPanel(nullptr)
+    , m_assetPanel(nullptr)
+    , m_propertyPanel(nullptr)
     , m_scenePanel(nullptr)
-    , m_spriteInspectorPanel(nullptr)
     , m_currentWindow(nullptr)
     , m_showExitConfirmation(false)
     , m_shouldExit(false)
@@ -20,7 +21,7 @@ EditorController::EditorController()
 void EditorController::update(sf::RenderWindow& window) {
     m_currentWindow = &window;
     
-    // Update character animation - ADD THIS
+    // Update character animation
     if (m_scenePanel && m_scenePanel->getCharacter()) {
         m_scenePanel->getCharacter()->update(ImGui::GetIO().DeltaTime);
     }
@@ -123,7 +124,7 @@ void EditorController::renderMainMenuBar() {
             }
             ImGui::Separator();
             if (ImGui::MenuItem("Delete Selected", "Delete")) {
-                if (m_spriteInspectorPanel && m_spriteInspectorPanel->getSelectedSprite()) {
+                if (m_propertyPanel && m_assetPanel && m_assetPanel->getSelectedSprite()) {
                     // TODO: Implement sprite deletion
                     std::cout << "Delete Selected Sprite - not implemented yet" << std::endl;
                 }
@@ -201,8 +202,8 @@ void EditorController::renderMainMenuBar() {
             ImGui::Text("Sprites: %zu", spriteCount);
         }
         
-        if (m_spriteInspectorPanel && m_spriteInspectorPanel->getSelectedSprite()) {
-            ImGui::Text("| Selected: %s", m_spriteInspectorPanel->getSelectedSprite()->getName().c_str());
+        if (m_assetPanel && m_assetPanel->getSelectedSprite()) {
+            ImGui::Text("| Selected: %s", m_assetPanel->getSelectedSprite()->getName().c_str());
         }
         
         ImGui::EndMainMenuBar();
@@ -219,15 +220,20 @@ void EditorController::initializePanels() {
     m_assetBrowserPanel = assetBrowser.get();
     m_panels.push_back(std::move(assetBrowser));
     
+    // Create asset panel
+    auto assetPanel = std::make_unique<AssetPanel>();
+    m_assetPanel = assetPanel.get();
+    m_panels.push_back(std::move(assetPanel));
+    
+    // Create property panel
+    auto propertyPanel = std::make_unique<PropertyPanel>();
+    m_propertyPanel = propertyPanel.get();
+    m_panels.push_back(std::move(propertyPanel));
+    
     // Create scene panel
     auto scenePanel = std::make_unique<ScenePanel>();
     m_scenePanel = scenePanel.get();
     m_panels.push_back(std::move(scenePanel));
-    
-    // Create sprite inspector panel
-    auto spriteInspector = std::make_unique<SpriteInspectorPanel>();
-    m_spriteInspectorPanel = spriteInspector.get();
-    m_panels.push_back(std::move(spriteInspector));
 
     // Animation panel
     auto animationPanel = std::make_unique<AnimationPanel>();
@@ -238,14 +244,28 @@ void EditorController::initializePanels() {
 }
 
 void EditorController::setupPanelCallbacks() {
-    // Setup asset browser callback
+    // Setup asset browser callbacks
     if (m_assetBrowserPanel) {
+        // Single asset selection (existing)
         m_assetBrowserPanel->setOnAssetSelected(
             [this](const AssetInfo& asset) {
                 onAssetSelected(asset);
-                m_hasUnsavedChanges = true; // Mark as changed
+                m_hasUnsavedChanges = true;
             }
         );
+        
+        // Multiple asset selection
+        m_assetBrowserPanel->setOnMultipleAssetsSelected(
+            [this](const std::vector<AssetInfo>& assets) {
+                onMultipleAssetsSelected(assets);
+                m_hasUnsavedChanges = true;
+            }
+        );
+    }
+
+    // Connect asset browser to asset panel
+    if (m_assetPanel && m_assetBrowserPanel) {
+        m_assetPanel->setAssetBrowserPanel(m_assetBrowserPanel);
     }
     
     // Setup scene panel callbacks
@@ -269,38 +289,51 @@ void EditorController::setupPanelCallbacks() {
         );
     }
     
-    // Setup sprite inspector callback
-    if (m_spriteInspectorPanel) {
-        m_spriteInspectorPanel->setOnSpriteSelected(
+    // Setup asset panel callback
+    if (m_assetPanel) {
+        m_assetPanel->setOnSpriteSelected(
             [this](Sprite* sprite) {
                 onSpriteSelected(sprite);
             }
         );
-    }
-    
-    // Connect sprite inspector to scene panel's character
-    if (m_scenePanel && m_spriteInspectorPanel) {
-        m_spriteInspectorPanel->setCharacter(m_scenePanel->getCharacter());
+        m_assetPanel->setOnSpriteDeleted(
+            [this](Sprite* sprite) {
+                onSpriteDeleted(sprite);
+                m_hasUnsavedChanges = true; // Mark as changed
+            }
+        );
     }
 
-    // Set character reference for animation panel
-    if (m_scenePanel && m_animationPanel) {
-        m_animationPanel->setCharacter(m_scenePanel->getCharacter());
+    // Connect character references
+    if (m_scenePanel) {
+        Character* character = m_scenePanel->getCharacter();
         
-        // Connect animation recording to scene changes
-        m_scenePanel->setOnBoneRotated([this](std::shared_ptr<Bone> bone, float rotation) {
-            // When recording and bone is rotated, add keyframe
-            if (m_animationPanel->isRecording()) {
-                auto* player = m_scenePanel->getCharacter()->getAnimationPlayer();
-                auto* currentAnim = player->getAnimation();
-                if (currentAnim && bone) {
-                    float currentTime = m_animationPanel->getCurrentTime();
-                    Transform transform = bone->getLocalTransform();
-                    currentAnim->addKeyframe(bone->getName(), currentTime, transform);
-                    std::cout << "Auto-recorded keyframe for " << bone->getName() << " at time " << currentTime << std::endl;
+        if (m_assetPanel) {
+            m_assetPanel->setCharacter(character);
+        }
+        
+        if (m_propertyPanel) {
+            m_propertyPanel->setCharacter(character);
+        }
+        
+        if (m_animationPanel) {
+            m_animationPanel->setCharacter(character);
+            
+            // Connect animation recording to scene changes
+            m_scenePanel->setOnBoneRotated([this](std::shared_ptr<Bone> bone, float rotation) {
+                // When recording and bone is rotated, add keyframe
+                if (m_animationPanel->isRecording()) {
+                    auto* player = m_scenePanel->getCharacter()->getAnimationPlayer();
+                    auto* currentAnim = player->getAnimation();
+                    if (currentAnim && bone) {
+                        float currentTime = m_animationPanel->getCurrentTime();
+                        Transform transform = bone->getLocalTransform();
+                        currentAnim->addKeyframe(bone->getName(), currentTime, transform);
+                        std::cout << "Auto-recorded keyframe for " << bone->getName() << " at time " << currentTime << std::endl;
+                    }
                 }
-            }
-        });
+            });
+        }
     }
     
     std::cout << "Panel callbacks setup complete" << std::endl;
@@ -309,17 +342,56 @@ void EditorController::setupPanelCallbacks() {
 void EditorController::onAssetSelected(const AssetInfo& asset) {
     if (!m_scenePanel) return;
     
-    // Add sprite to scene at center of current view
-    sf::Vector2f centerPosition = m_scenePanel->getView().getCenter();
-    m_scenePanel->addSpriteFromAsset(asset, centerPosition);
+    // Check if it's an image asset
+    if (asset.type == "image") {
+        // Add sprite to scene at center of current view
+        sf::Vector2f centerPosition = m_scenePanel->getView().getCenter();
+        
+        // Use ScenePanel's method to add sprite
+        m_scenePanel->addSpriteFromAsset(asset, centerPosition);
+        
+        std::cout << "Added sprite from asset: " << asset.name << std::endl;
+    } else {
+        std::cout << "Selected asset is not an image: " << asset.name << " (type: " << asset.type << ")" << std::endl;
+    }
+}
+
+void EditorController::onMultipleAssetsSelected(const std::vector<AssetInfo>& assets) {
+    if (!m_scenePanel || assets.empty()) return;
     
-    std::cout << "Added sprite from asset: " << asset.name << std::endl;
+    std::cout << "Adding " << assets.size() << " assets to character..." << std::endl;
+    
+    // Add each selected asset as a sprite
+    for (size_t i = 0; i < assets.size(); ++i) {
+        const auto& asset = assets[i];
+        
+        // Check if it's an image asset (using string type field)
+        if (asset.type == "image") {
+            // Position sprites in a grid to avoid overlap
+            float offsetX = (i % 5) * 120.0f; // 5 sprites per row
+            float offsetY = (i / 5) * 120.0f; // Next row every 5 sprites
+            sf::Vector2f position(offsetX, offsetY);
+            
+            // Use ScenePanel's addSpriteFromAsset method (same as single selection)
+            m_scenePanel->addSpriteFromAsset(asset, position);
+            
+            std::cout << "Added sprite: " << asset.name << " from " << asset.path << std::endl;
+        } else {
+            std::cout << "Skipped non-image asset: " << asset.name << " (type: " << asset.type << ")" << std::endl;
+        }
+    }
+    
+    std::cout << "Successfully processed " << assets.size() << " assets" << std::endl;
 }
 
 void EditorController::onSpriteSelected(Sprite* sprite) {
-    // Sync selection between scene panel and sprite inspector
-    if (m_spriteInspectorPanel) {
-        m_spriteInspectorPanel->setSelectedSprite(sprite);
+    // Sync selection between all panels
+    if (m_assetPanel) {
+        m_assetPanel->setSelectedSprite(sprite);
+    }
+    
+    if (m_propertyPanel) {
+        m_propertyPanel->setSelectedSprite(sprite);
     }
     
     if (sprite) {
@@ -329,7 +401,25 @@ void EditorController::onSpriteSelected(Sprite* sprite) {
     }
 }
 
+void EditorController::onSpriteDeleted(Sprite* sprite) {
+    // Clear selection from all panels if deleted sprite was selected
+    if (m_propertyPanel) {
+        if (m_propertyPanel->getSelectedSprite() == sprite) {
+            m_propertyPanel->clearSelection();
+        }
+    }
+    
+    if (sprite) {
+        std::cout << "Sprite deleted: " << sprite->getName() << std::endl;
+    }
+}
+
 void EditorController::onBoneSelected(std::shared_ptr<Bone> bone) {
+    // Update property panel for bone selection (future use)
+    if (m_propertyPanel) {
+        m_propertyPanel->setSelectedBone(bone.get());
+    }
+
     if (bone) {
         std::cout << "Bone selected: " << bone->getName() << std::endl;
     } else {
@@ -457,10 +547,21 @@ void EditorController::newProject() {
         newCharacter->setRig(std::move(rig));
         m_scenePanel->setCharacter(std::move(newCharacter));
         
-        // Update sprite inspector with new character
-        if (m_spriteInspectorPanel) {
-            m_spriteInspectorPanel->setCharacter(m_scenePanel->getCharacter());
-            m_spriteInspectorPanel->setSelectedSprite(nullptr);
+        // Update all panels with new character
+        Character* character = m_scenePanel->getCharacter();
+        
+        if (m_assetPanel) {
+            m_assetPanel->setCharacter(character);
+            m_assetPanel->setSelectedSprite(nullptr);
+        }
+        
+        if (m_propertyPanel) {
+            m_propertyPanel->setCharacter(character);
+            m_propertyPanel->clearSelection();
+        }
+        
+        if (m_animationPanel) {
+            m_animationPanel->setCharacter(character);
         }
     }
     

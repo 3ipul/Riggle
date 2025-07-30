@@ -63,10 +63,8 @@ bool IK_Solver::solveCCDChain(
         float dy = currentEnd.y - targetPosition.y;
         float distance = std::sqrt(dx * dx + dy * dy);
         
-        std::cout << "IK Iteration " << iteration << ": distance = " << distance << std::endl;
         
         if (distance < 15.0f) {
-            std::cout << "IK: Converged!" << std::endl;
             return true;
         }
         
@@ -74,11 +72,8 @@ bool IK_Solver::solveCCDChain(
         for (int i = 0; i < chain.size(); ++i) {
             auto bone = chain[i];
             if (!bone) {
-                std::cout << "IK Error: Null bone at index " << i << std::endl;
                 continue;
             }
-            
-            std::cout << "IK: Rotating bone '" << bone->getName() << "'" << std::endl;
             
             // Get joint position (start of this bone)
             float jointStartX, jointStartY, jointEndX, jointEndY;
@@ -117,7 +112,6 @@ bool IK_Solver::solveCCDChain(
             // CRITICAL: Force update all children transforms
             forceUpdateChildrenTransforms(bone);
             
-            std::cout << "IK: Applied rotation " << (rotationDelta * 180.0f / 3.14159f) << " degrees" << std::endl;
         }
     }
     

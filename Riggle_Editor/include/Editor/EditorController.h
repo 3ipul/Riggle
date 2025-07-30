@@ -2,8 +2,9 @@
 
 #include <SFML/Graphics.hpp>
 #include "Panels/AssetBrowserPanel.h"
+#include "Panels/AssetPanel.h"
+#include "Panels/PropertyPanel.h"
 #include "Panels/ScenePanel.h"
-#include "Panels/SpriteInspectorPanel.h"
 #include "Panels/AnimationPanel.h"
 #include <memory>
 #include <vector>
@@ -25,7 +26,8 @@ public:
     
     // Panel access
     ScenePanel* getScenePanel() const { return m_scenePanel; }
-    SpriteInspectorPanel* getSpriteInspectorPanel() const { return m_spriteInspectorPanel; }
+    AssetPanel* getAssetPanel() const { return m_assetPanel; }
+    PropertyPanel* getPropertyPanel() const { return m_propertyPanel; }
     AssetBrowserPanel* getAssetBrowserPanel() const { return m_assetBrowserPanel; }
     AnimationPanel* getAnimationPanel() const { return m_animationPanel; }
 
@@ -33,8 +35,9 @@ private:
     // Panel management
     std::vector<std::unique_ptr<BasePanel>> m_panels;
     AssetBrowserPanel* m_assetBrowserPanel;
+    AssetPanel* m_assetPanel;
+    PropertyPanel* m_propertyPanel;
     ScenePanel* m_scenePanel;
-    SpriteInspectorPanel* m_spriteInspectorPanel;
     AnimationPanel* m_animationPanel;
     
     // State
@@ -54,7 +57,9 @@ private:
     
     // Event callbacks
     void onAssetSelected(const AssetInfo& asset);
+    void onMultipleAssetsSelected(const std::vector<AssetInfo>& assets);
     void onSpriteSelected(Sprite* sprite);
+    void onSpriteDeleted(Sprite* sprite);
     void onBoneSelected(std::shared_ptr<Bone> bone);    
     void onSpriteBindingChanged(Sprite* sprite, std::shared_ptr<Bone> bone);  
     

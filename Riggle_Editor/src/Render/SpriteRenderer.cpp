@@ -8,11 +8,19 @@ SpriteRenderer::SpriteRenderer() {
 
 void SpriteRenderer::render(sf::RenderTarget& target, const Character& character) {
     for (const auto& sprite : character.getSprites()) {
-        renderSprite(target, *sprite);
+        // Check visibility before rendering
+        if (sprite->isVisible()) {
+            renderSprite(target, *sprite);
+        }
     }
 }
 
 void SpriteRenderer::renderSprite(sf::RenderTarget& target, const Sprite& sprite) {
+    // Additional visibility check for safety
+    if (!sprite.isVisible()) {
+        return;
+    }
+    
     const auto& vertices = sprite.getDeformedVertices();
     if (vertices.size() < 4) return;
 
