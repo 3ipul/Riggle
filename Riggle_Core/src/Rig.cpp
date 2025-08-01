@@ -22,18 +22,35 @@ std::shared_ptr<Bone> Rig::createChildBone(std::shared_ptr<Bone> parent, const s
 }
 
 void Rig::removeBone(const std::string& name) {
-    // Remove from root bones
-    auto it = std::remove_if(m_rootBones.begin(), m_rootBones.end(),
-        [&name](const std::shared_ptr<Bone>& bone) {
-            return bone->getName() == name;
-        });
+    auto bone = findBone(name);
+    if (!bone) return;
     
-    if (it != m_rootBones.end()) {
-        m_rootBones.erase(it, m_rootBones.end());
-        return;
+    // Check if it's a root bone
+    bool isRootBone = (bone->getParent() == nullptr);
+    
+    if (isRootBone) {
+        // Root bone can only be deleted if it has no children
+        if (!bone->getChildren().empty()) return;
+        
+        // Remove from root bones list
+        auto it = std::find(m_rootBones.begin(), m_rootBones.end(), bone);
+        if (it != m_rootBones.end()) {
+            m_rootBones.erase(it);
+        }
+    } else {
+        // Child bone - remove from parent and move children up
+        auto parent = bone->getParent();
+        if (parent) {
+            parent->removeChild(bone);
+            
+            // Move all children to the parent
+            for (auto& child : bone->getChildren())
+                parent->addChild(child);
+        }
     }
     
-    // TODO: Remove from child bones (recursive search)
+    // Update world transforms
+    updateWorldTransforms();
 }
 
 std::shared_ptr<Bone> Rig::findBone(const std::string& name) {

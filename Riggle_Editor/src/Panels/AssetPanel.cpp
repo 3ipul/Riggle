@@ -37,6 +37,21 @@ void AssetPanel::render() {
     ImGui::End();
 }
 
+void AssetPanel::renderContent() {
+    // Render just the content without the ImGui::Begin/End wrapper
+    if (!m_character) {
+        ImGui::Text("No character loaded");
+    } else {
+        const auto& sprites = m_character->getSprites();
+        
+        if (sprites.empty()) {
+            renderEmptyState();
+        } else {
+            renderSpriteList();
+        }
+    }
+}
+
 void AssetPanel::update(sf::RenderWindow& window) {
     // No update logic needed for now
 }
@@ -45,22 +60,37 @@ void AssetPanel::renderEmptyState() {
     ImGui::Spacing();
     ImGui::Text("No sprites loaded");
     ImGui::Spacing();
+
+     // Instructional message
+    ImGui::TextWrapped("Use Asset Browser panel to load sprites into your character.");
+    ImGui::Spacing();
     
-    // Center the add button
-    float buttonWidth = 120.0f;
-    float windowWidth = ImGui::GetContentRegionAvail().x;
-    ImGui::SetCursorPosX((windowWidth - buttonWidth) * 0.5f);
-    
-    if (ImGui::Button("Add Sprite", ImVec2(buttonWidth, 40))) {
-        // Instead of showing modal, just make Asset Browser visible
-        if (m_assetBrowserPanel) {
-            m_assetBrowserPanel->setVisible(true);
-            std::cout << "Asset Browser panel made visible" << std::endl;
+    // Show "Show Asset Browser" button only if Asset Browser is not visible
+    if (!isAssetBrowserVisible()) {
+        // Center the button
+        float buttonWidth = 150.0f;
+        float windowWidth = ImGui::GetContentRegionAvail().x;
+        ImGui::SetCursorPosX((windowWidth - buttonWidth) * 0.5f);
+        
+        if (ImGui::Button("Show Asset Browser", ImVec2(buttonWidth, 40))) {
+            if (m_assetBrowserPanel) {
+                m_assetBrowserPanel->setVisible(true);
+                std::cout << "Asset Browser panel made visible" << std::endl;
+            }
         }
+        
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("Open the Asset Browser panel to browse and select image files");
+        }
+    } else {
+        // When Asset Browser is visible, show a different message
+        ImGui::Spacing();
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.7f, 0.9f, 0.7f, 1.0f)); // Light green text
+        ImGui::TextWrapped("Asset Browser is open. Browse and select image files to add them as sprites.");
+        ImGui::PopStyleColor();
     }
     
     ImGui::Spacing();
-    ImGui::TextWrapped("Click 'Add Sprite' to open the Asset Browser panel and select image files to add to your character.");
 }
 
 void AssetPanel::renderSpriteList() {
@@ -69,13 +99,25 @@ void AssetPanel::renderSpriteList() {
     // Header with sprite count and add button
     ImGui::Text("Sprites (%zu)", sprites.size());
     ImGui::SameLine();
-    ImGui::SetCursorPosX(ImGui::GetContentRegionAvail().x - 80);
-    if (ImGui::Button("Add Sprite")) {
-        // Make Asset Browser visible
-        if (m_assetBrowserPanel) {
-            m_assetBrowserPanel->setVisible(true);
-            std::cout << "Asset Browser panel made visible" << std::endl;
+
+    // Show "Show Asset Browser" button only if Asset Browser is not visible
+    if (!isAssetBrowserVisible()) {
+        ImGui::SetCursorPosX(ImGui::GetContentRegionAvail().x - 150);
+        if (ImGui::Button("Show Asset Browser")) {
+            if (m_assetBrowserPanel) {
+                m_assetBrowserPanel->setVisible(true);
+                std::cout << "Asset Browser panel made visible" << std::endl;
+            }
         }
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("Open the Asset Browser panel to add more sprites");
+        }
+    } else {
+        // When Asset Browser is visible, show status text
+        ImGui::SetCursorPosX(ImGui::GetContentRegionAvail().x - 120);
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.7f, 0.9f, 0.7f, 1.0f)); // Light green text
+        ImGui::Text("Asset Browser Open");
+        ImGui::PopStyleColor();
     }
     
     ImGui::Separator();
@@ -93,6 +135,10 @@ void AssetPanel::renderSpriteList() {
         }
     }
     ImGui::EndChild();
+}
+
+bool AssetPanel::isAssetBrowserVisible() const {
+    return m_assetBrowserPanel && m_assetBrowserPanel->isVisible();
 }
 
 void AssetPanel::renderSpriteItem(Sprite* sprite, size_t index) {
@@ -240,10 +286,17 @@ void AssetPanel::renderSpriteItem(Sprite* sprite, size_t index) {
         ImGui::Text("Name: %s", sprite->getName().c_str());
         ImGui::Text("Path: %s", sprite->getTexturePath().c_str());
         Transform transform = sprite->getLocalTransform();
-        ImGui::Text("Position: (%.1f, %.1f)", transform.x, transform.y);
+        ImGui::Text("Position: (%.1f, %.1f)", transform.position.x, transform.position.y);
         ImGui::Text("Visible: %s", sprite->isVisible() ? "Yes" : "No");
-        if (sprite->isBoundToBones()) {
-            ImGui::Text("Bound to %zu bones", sprite->getBoneBindings().size());
+        if (sprite->isBoundToBone()) {
+            ImGui::SameLine();
+            ImGui::TextColored(ImVec4(0.3f, 0.7f, 1.0f, 1.0f), "(Bound)");
+            
+            // Show which bone it's bound to
+            if (auto boundBone = sprite->getBoundBone()) {
+                ImGui::SameLine();
+                ImGui::Text("-> %s", boundBone->getName().c_str());
+            }
         }
         ImGui::Separator();
         // Add selection instruction to tooltip

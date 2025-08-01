@@ -32,10 +32,12 @@ add_executable(Riggle_Editor
     src/Render/SpriteRenderer.cpp
     src/Panels/AssetPanel.cpp
     src/Panels/AssetBrowserPanel.cpp
+    src/Panels/HierarchyPanel.cpp
     src/Panels/PropertyPanel.cpp
-    src/Panels/ScenePanel.cpp
+    src/Panels/ViewportPanel.cpp
     src/Panels/AnimationPanel.cpp
     src/Tools/BoneCreationTool.cpp
+    src/Tools/SpriteManipulationTool.cpp
     # src/ToolMode.cpp
     # Add other source files...
 )

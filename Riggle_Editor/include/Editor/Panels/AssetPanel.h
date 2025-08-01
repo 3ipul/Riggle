@@ -17,6 +17,7 @@ public:
 
     void render() override;
     void update(sf::RenderWindow& window) override;
+    void renderContent() override;
 
     // Character management
     void setCharacter(Character* character) { m_character = character; }
@@ -67,6 +68,7 @@ private:
     void deleteSprite(size_t index);
     void toggleSpriteVisibility(size_t index);
     void handleDragAndDrop(size_t index);
+    bool isAssetBrowserVisible() const;
 };
 
 } // namespace Riggle

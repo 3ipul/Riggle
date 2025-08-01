@@ -9,17 +9,15 @@ namespace Riggle {
 
 class Bone;
 
+// Simplified binding - one sprite = one bone only
 struct BoneBinding {
     std::shared_ptr<Bone> bone;
-    float weight;           // 0.0 to 1.0
-    Vector2 bindOffset;     // Offset from bone when binding
-    float bindRotation;     // Bone's rotation when bound (to calculate relative rotation)
-    
-    BoneBinding(std::shared_ptr<Bone> b, float w = 1.0f) 
-        : bone(b), weight(w), bindOffset(0.0f, 0.0f), bindRotation(0.0f) {}
+    float weight;           // Always 1.0 for single bone binding
+    Vector2 bindOffset;     // Offset from bone origin when bound
+    float bindRotation;     // Rotation relative to bone when bound
 };
 
-class Sprite {
+class Sprite : public std::enable_shared_from_this<Sprite> {
 public:
     Sprite(const std::string& name, const std::string& texturePath);
     ~Sprite() = default;
@@ -27,58 +25,39 @@ public:
     // Basic properties
     const std::string& getName() const { return m_name; }
     void setName(const std::string& name) { m_name = name; }
+    
     const std::string& getTexturePath() const { return m_texturePath; }
-    void setTexturePath(const std::string& path) { m_texturePath = path; }
-
-    // Transform
-    Transform getLocalTransform() const { return m_localTransform; }
-    void setLocalTransform(const Transform& transform) { m_localTransform = transform; }
-    void setTransform(const Transform& transform) { setLocalTransform(transform); }
     
-    // Vertices
-    const std::vector<Vertex>& getOriginalVertices() const { return m_originalVertices; }
-    const std::vector<Vertex>& getDeformedVertices() const { return m_deformedVertices; }
-    void setVertices(const std::vector<Vertex>& vertices);
-    void setupAsQuad(float width, float height, const Vector2& pivot = Vector2(0.5f, 0.5f));
-
-    // CLEAN BONE BINDING SYSTEM (no legacy)
-    void bindToBone(std::shared_ptr<Bone> bone, float weight = 1.0f);
-    void unbindFromBone(std::shared_ptr<Bone> bone);
-    void clearAllBindings();
-    
-    // Check bindings
-    bool isBoundToBones() const { return !m_boneBindings.empty(); }
-    const std::vector<BoneBinding>& getBoneBindings() const { return m_boneBindings; }
-    std::shared_ptr<Bone> getPrimaryBone() const; // Highest weight bone
-    
-    // Deformation
-    Transform getWorldTransform() const;
-    void updateDeformation();
-    
-    // Visibility
     bool isVisible() const { return m_isVisible; }
     void setVisible(bool visible) { m_isVisible = visible; }
+
+    // Transform
+    const Transform& getLocalTransform() const { return m_localTransform; }
+    void setLocalTransform(const Transform& transform) { m_localTransform = transform; }
+    void setTransform(const Transform& transform) { m_localTransform = transform; }
+    Transform getWorldTransform() const;
+
+    // SIMPLIFIED: Single bone binding only
+    bool isBoundToBone() const { return m_binding.bone != nullptr; }
+    std::shared_ptr<Bone> getBoundBone() const { return m_binding.bone; }
+    const BoneBinding& getBoneBinding() const { return m_binding; }
+    
+    // Binding operations
+    void bindToBone(std::shared_ptr<Bone> bone, const Vector2& offset = {0, 0}, float rotation = 0.0f);
+    void unbindFromBone();
+    void clearBinding() { unbindFromBone(); }
+    
+    // Update transform based on bone (called during animation)
+    void updateFromBone();
 
 private:
     std::string m_name;
     std::string m_texturePath;
-    
+    bool m_isVisible;
     Transform m_localTransform;
     
-    std::vector<Vertex> m_originalVertices;
-    std::vector<Vertex> m_deformedVertices;
-    
-    // ONLY multi-bone binding system
-    std::vector<BoneBinding> m_boneBindings;
-    
-    bool m_isVisible;
-    
-    // Helper functions
-    void applyBoneDeformation();
-    void normalizeWeights();
-    Vector2 getCurrentCenterPosition() const;
-    void calculateBindOffset(BoneBinding& binding);
+    // SIMPLIFIED: Single bone binding
+    BoneBinding m_binding;  // Only one binding per sprite
 };
-// ...existing code...
 
 } // namespace Riggle

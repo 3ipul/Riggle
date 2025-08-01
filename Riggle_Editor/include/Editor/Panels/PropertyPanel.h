@@ -11,7 +11,8 @@ namespace Riggle {
 enum class PropertyType {
     None,
     Sprite,
-    Bone  // For future Hierarchy panel integration
+    Bone, // For future Hierarchy panel integration
+    MultiSelection
 };
 
 class PropertyPanel : public BasePanel {
@@ -24,13 +25,19 @@ public:
 
     // Selection management
     void setSelectedSprite(Sprite* sprite);
-    void setSelectedBone(Bone* bone);  // For future use
+    void setSelectedBone(std::shared_ptr<Bone> bone);
     void clearSelection();
+
+    // Multi-selection support
+    void setMultiSelection(Sprite* sprite, std::shared_ptr<Bone> bone);
+    bool hasMultipleTypesSelected() const { return m_selectedSprite && m_selectedBone; }
 
     Sprite* getSelectedSprite() const { return m_selectedSprite; }
 
     // Character management
     void setCharacter(Character* character) { m_character = character; }
+
+    bool m_showHelp; // Help dialog state
 
 private:
     Character* m_character;
@@ -38,7 +45,7 @@ private:
     
     // Selected objects
     Sprite* m_selectedSprite;
-    Bone* m_selectedBone;  // For future use
+    std::shared_ptr<Bone> m_selectedBone;
     
     // Movement controls
     float m_moveStep;
@@ -47,11 +54,20 @@ private:
     // Helper functions
     void renderEmptyState();
     void renderSpriteProperties();
-    void renderBoneProperties();  // For future use
+    void renderBoundSpriteInfo();
+    void renderHelpDialog();
     void renderTransformControls();
     void renderMovementButtons();
     void renderSpriteBindings();
     void moveSprite(float deltaX, float deltaY);
+
+    void renderMultiSelectionProperties();
+    void renderBindingControls();
+
+    void renderBoneProperties();
+    void renderBoneTransformControls();
+    void renderBoneHierarchyInfo();
+    void renderBoneSpriteBindings();
 };
 
 } // namespace Riggle

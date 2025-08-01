@@ -89,11 +89,11 @@ size_t BoneTrack::findKeyframeIndex(float time) const {
 Transform BoneTrack::interpolateTransforms(const Transform& a, const Transform& b, float t) const {
     Transform result;
     
-    // Linear interpolation for position and scale
-    result.x = a.x + (b.x - a.x) * t;
-    result.y = a.y + (b.y - a.y) * t;
-    result.scaleX = a.scaleX + (b.scaleX - a.scaleX) * t;
-    result.scaleY = a.scaleY + (b.scaleY - a.scaleY) * t;
+    // FIXED: Linear interpolation for position and scale using Vector2
+    result.position.x = a.position.x + (b.position.x - a.position.x) * t;
+    result.position.y = a.position.y + (b.position.y - a.position.y) * t;
+    result.scale.x = a.scale.x + (b.scale.x - a.scale.x) * t;
+    result.scale.y = a.scale.y + (b.scale.y - a.scale.y) * t;
     result.length = a.length + (b.length - a.length) * t;
     
     // Shortest path rotation interpolation

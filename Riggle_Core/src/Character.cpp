@@ -123,13 +123,13 @@ void Character::update(float deltaTime) {
 void Character::updateDeformations() {
     if (!m_rig) return;
     
-    // First, update the rig hierarchy (recalculate world transforms)
-    m_rig->updateWorldTransforms();
+   // Update all bone world transforms first
+    m_rig->forceUpdateWorldTransforms();
     
-    // Then, update all sprite deformations
+    // Update all sprites based on their bone bindings
     for (auto& sprite : m_sprites) {
-        if (sprite) {
-            sprite->updateDeformation();
+        if (sprite->isBoundToBone()) {
+            sprite->updateFromBone();  // CHANGED: was updateDeformation()
         }
     }
 }

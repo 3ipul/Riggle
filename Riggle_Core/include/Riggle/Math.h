@@ -16,6 +16,11 @@ struct Vector2 {
     Vector2 operator*(float scalar) const { return Vector2(x * scalar, y * scalar); }
     Vector2 operator/(float scalar) const { return Vector2(x / scalar, y / scalar); }
     
+    // Assignment operators
+    Vector2& operator+=(const Vector2& other) { x += other.x; y += other.y; return *this; }
+    Vector2& operator-=(const Vector2& other) { x -= other.x; y -= other.y; return *this; }
+    Vector2& operator*=(float scalar) { x *= scalar; y *= scalar; return *this; }
+    
     // Dot product
     float dot(const Vector2& other) const { return x * other.x + y * other.y; }
     
@@ -34,27 +39,29 @@ struct Vector2 {
     }
 };
 
-// Unified Transform struct with all necessary fields
+// Consistent Transform struct with Vector2 for position and scale
 struct Transform {
-    float x = 0.0f;        // X position
-    float y = 0.0f;        // Y position
-    float rotation = 0.0f; // Rotation in radians
-    float scaleX = 1.0f;   // X scale factor
-    float scaleY = 1.0f;   // Y scale factor
-    float length = 50.0f;  // Length (used by bones)
+    Vector2 position = {0.0f, 0.0f};  // Position as Vector2
+    float rotation = 0.0f;            // Rotation in radians
+    Vector2 scale = {1.0f, 1.0f};     // Scale as Vector2
+    float length = 50.0f;             // Length (used by bones)
     
     Transform() = default;
     Transform(float x, float y, float rotation = 0.0f, float scaleX = 1.0f, float scaleY = 1.0f, float length = 50.0f)
-        : x(x), y(y), rotation(rotation), scaleX(scaleX), scaleY(scaleY), length(length) {}
-};
-
-// Simple Vertex struct for sprite deformation
-struct Vertex {
-    float x = 0.0f;
-    float y = 0.0f;
+        : position(x, y), rotation(rotation), scale(scaleX, scaleY), length(length) {}
+    Transform(const Vector2& pos, float rot = 0.0f, const Vector2& scl = {1.0f, 1.0f}, float len = 50.0f)
+        : position(pos), rotation(rot), scale(scl), length(len) {}
     
-    Vertex() = default;
-    Vertex(float x, float y) : x(x), y(y) {}
+    // Legacy accessors as getter/setter methods (if needed for backward compatibility)
+    float getX() const { return position.x; }
+    float getY() const { return position.y; }
+    float getScaleX() const { return scale.x; }
+    float getScaleY() const { return scale.y; }
+    
+    void setX(float x) { position.x = x; }
+    void setY(float y) { position.y = y; }
+    void setScaleX(float sx) { scale.x = sx; }
+    void setScaleY(float sy) { scale.y = sy; }
 };
 
 } // namespace Riggle

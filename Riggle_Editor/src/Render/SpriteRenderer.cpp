@@ -3,108 +3,142 @@
 
 namespace Riggle {
 
-SpriteRenderer::SpriteRenderer() {
+SpriteRenderer::SpriteRenderer()
+    : m_character(nullptr)
+{
+    createDefaultTexture();
 }
 
-void SpriteRenderer::render(sf::RenderTarget& target, const Character& character) {
-    for (const auto& sprite : character.getSprites()) {
-        // Check visibility before rendering
+void SpriteRenderer::render(sf::RenderTarget& target) {
+    if (!m_character) return;
+    
+    // Render all sprites
+    for (auto& sprite : m_character->getSprites()) {
         if (sprite->isVisible()) {
-            renderSprite(target, *sprite);
+            renderSprite(target, sprite.get());
         }
     }
 }
 
-void SpriteRenderer::renderSprite(sf::RenderTarget& target, const Sprite& sprite) {
-    // Additional visibility check for safety
-    if (!sprite.isVisible()) {
-        return;
+void SpriteRenderer::renderSprite(sf::RenderTarget& target, Sprite* sprite) {
+    if (!sprite) return;
+    
+    // Get texture
+    sf::Texture* texture = getTexture(sprite->getTexturePath());
+    if (!texture) {
+        texture = &m_defaultTexture; // Use default if texture not found
     }
     
-    const auto& vertices = sprite.getDeformedVertices();
-    if (vertices.size() < 4) return;
-
-    // Try to get texture
-    sf::Texture* texture = getTexture(sprite.getTexturePath());
+    // Create sprite
+    sf::Sprite sfSprite(*texture);
     
-    if (texture) {
-        // Render with texture
-        sf::VertexArray quad(sf::PrimitiveType::TriangleFan, 4);
-        
-        // Get texture size for UV coordinates
-        sf::Vector2u textureSize = texture->getSize();
-        
-        // Map vertices to texture coordinates
-        quad[0].position = toSFMLVector(vertices[0]);
-        quad[0].texCoords = sf::Vector2f(0, 0);
-        quad[0].color = sf::Color::White;
-        
-        quad[1].position = toSFMLVector(vertices[1]);
-        quad[1].texCoords = sf::Vector2f(static_cast<float>(textureSize.x), 0);
-        quad[1].color = sf::Color::White;
-        
-        quad[2].position = toSFMLVector(vertices[2]);
-        quad[2].texCoords = sf::Vector2f(static_cast<float>(textureSize.x), static_cast<float>(textureSize.y));
-        quad[2].color = sf::Color::White;
-        
-        quad[3].position = toSFMLVector(vertices[3]);
-        quad[3].texCoords = sf::Vector2f(0, static_cast<float>(textureSize.y));
-        quad[3].color = sf::Color::White;
-        
-        // Draw with texture
-        sf::RenderStates states;
-        states.texture = texture;
-        target.draw(quad, states);
-    } else {
-        // Fallback: render as colored shape
-        sf::ConvexShape shape;
-        shape.setPointCount(vertices.size());
-        
-        for (size_t i = 0; i < vertices.size(); ++i) {
-            shape.setPoint(i, toSFMLVector(vertices[i]));
-        }
-        
-        shape.setFillColor(sf::Color(100, 150, 200, 128)); // Semi-transparent blue
-        shape.setOutlineColor(sf::Color::White);
-        shape.setOutlineThickness(1.0f);
-        
-        target.draw(shape);
-    }
+    // Get world transform
+    Transform worldTransform = sprite->getWorldTransform();
+    
+    // Apply transform
+   sfSprite.setPosition(sf::Vector2f(worldTransform.position.x, worldTransform.position.y));
+    sfSprite.setRotation(sf::degrees(worldTransform.rotation * 180.0f / 3.14159f));
+    sfSprite.setScale(sf::Vector2f(worldTransform.scale.x, worldTransform.scale.y));
+    
+    // Center origin
+    sf::Vector2u textureSize = texture->getSize();
+    sfSprite.setOrigin(sf::Vector2f(textureSize.x * 0.5f, textureSize.y * 0.5f));
+    
+    // Draw sprite
+    target.draw(sfSprite);
 }
 
-bool SpriteRenderer::loadTexture(const std::string& path) {
-    if (m_textureCache.find(path) != m_textureCache.end()) {
-        return true; // Already loaded
+void SpriteRenderer::renderSpriteHighlight(sf::RenderTarget& target, Sprite* sprite) {
+    if (!sprite) return;
+    
+    // Get texture
+    sf::Texture* texture = getTexture(sprite->getTexturePath());
+    if (!texture) {
+        texture = &m_defaultTexture;
     }
     
-    sf::Texture texture;
-    if (texture.loadFromFile(path)) {
+    // Create highlighted sprite
+    sf::Sprite sfSprite(*texture);
+    
+    // Get world transform
+    Transform worldTransform = sprite->getWorldTransform();
+    
+    // Apply transform
+    sfSprite.setPosition(sf::Vector2f(worldTransform.position.x, worldTransform.position.y));
+    sfSprite.setRotation(sf::degrees(worldTransform.rotation * 180.0f / 3.14159f));
+    sfSprite.setScale(sf::Vector2f(worldTransform.scale.x, worldTransform.scale.y));
+    
+    // Center origin
+    sf::Vector2u textureSize = texture->getSize();
+    sfSprite.setOrigin(sf::Vector2f(textureSize.x * 0.5f, textureSize.y * 0.5f));
+
+    // Add highlight effect (tint with selection color)
+    sfSprite.setColor(sf::Color(255, 100, 100, 200)); // Red tint
+    
+    target.draw(sfSprite);
+    
+    // Draw selection outline
+    sf::RectangleShape outline;
+    outline.setSize(sf::Vector2f(textureSize.x * worldTransform.scale.x, 
+                                textureSize.y * worldTransform.scale.y));
+    outline.setOrigin(sf::Vector2f(outline.getSize().x * 0.5f, outline.getSize().y * 0.5f));
+    outline.setPosition(sf::Vector2f(worldTransform.position.x, worldTransform.position.y));
+    outline.setRotation(sf::degrees(worldTransform.rotation * 180.0f / 3.14159f));
+    outline.setFillColor(sf::Color::Transparent);
+    outline.setOutlineThickness(2.0f);
+    outline.setOutlineColor(sf::Color::Red);
+    
+    target.draw(outline);
+}
+
+sf::Texture* SpriteRenderer::getTexture(const std::string& path) {
+    if (path.empty()) return &m_defaultTexture;
+    
+    // Check cache first
+    auto it = m_textureCache.find(path);
+    if (it != m_textureCache.end()) {
+        return it->second.get();
+    }
+    
+    // Load new texture
+    return loadTexture(path);
+}
+
+sf::Texture* SpriteRenderer::loadTexture(const std::string& path) {
+    auto texture = std::make_unique<sf::Texture>();
+    
+    if (texture->loadFromFile(path)) {
+        sf::Texture* result = texture.get();
         m_textureCache[path] = std::move(texture);
         std::cout << "Loaded texture: " << path << std::endl;
-        return true;
+        return result;
+    } else {
+        std::cout << "Failed to load texture: " << path << std::endl;
+        return &m_defaultTexture;
     }
-    
-    std::cout << "Failed to load texture: " << path << std::endl;
-    return false;
 }
 
 void SpriteRenderer::clearTextureCache() {
     m_textureCache.clear();
 }
 
-sf::Texture* SpriteRenderer::getTexture(const std::string& path) {
-    // Try to load texture if not already cached
-    if (m_textureCache.find(path) == m_textureCache.end()) {
-        if (!loadTexture(path)) {
-            return nullptr;
+void SpriteRenderer::createDefaultTexture() {
+    // Create a simple 64x64 checkerboard pattern
+    const unsigned int size = 64;
+    sf::Image image;
+    image.resize(sf::Vector2u(size, size));
+    
+    // Create checkerboard pattern
+    for (unsigned int x = 0; x < size; ++x) {
+        for (unsigned int y = 0; y < size; ++y) {
+            bool checker = ((x / 8) + (y / 8)) % 2 == 0;
+            sf::Color color = checker ? sf::Color::Magenta : sf::Color::White;
+            image.setPixel(sf::Vector2u(x, y), color);
         }
     }
     
-    return &m_textureCache[path];
-}
-
-sf::Vector2f SpriteRenderer::toSFMLVector(const Riggle::Vertex& vertex) const {
-    return sf::Vector2f(vertex.x, vertex.y);
+    m_defaultTexture.loadFromImage(image);
+    std::cout << "Created default texture" << std::endl;
 }
 
 } // namespace Riggle

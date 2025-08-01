@@ -1,24 +1,17 @@
 #pragma once
-#include <SFML/Graphics.hpp>
-#include <Riggle/Rig.h>
+#include <Riggle/Character.h>
 #include <Riggle/Bone.h>
-#include <memory>
+#include <Riggle/Rig.h>
+#include <SFML/Graphics.hpp>
 #include <functional>
+#include <memory>
 
 namespace Riggle {
 
-enum class BoneToolMode {
-    Creating,
-    Selecting,
-    Rotating,    // NEW: For FK rotation
-    Moving
-};
-
-enum class BoneHandle {
-    None,
-    Start,
-    End,
-    Shaft
+enum class BoneCreationState {
+    Idle,           // No bone creation in progress
+    Creating,       // Mouse pressed, dragging to set bone length and direction
+    Complete        // Bone created
 };
 
 class BoneCreationTool {
@@ -26,82 +19,100 @@ public:
     BoneCreationTool();
     ~BoneCreationTool() = default;
 
-    void setRig(Rig* rig) { m_rig = rig; }
-    
-    // Tool state
-    void setActive(bool active) { m_isActive = active; }
+    // Setup
+    void setCharacter(Character* character) { m_character = character; }
+    void setActive(bool active);
     bool isActive() const { return m_isActive; }
+
+    // Bone creation
+    void handleMousePressed(const sf::Vector2f& worldPos);
+    void handleMouseMoved(const sf::Vector2f& worldPos);
+    void handleMouseReleased(const sf::Vector2f& worldPos);
     
-    BoneToolMode getMode() const { return m_mode; }
-    void setMode(BoneToolMode mode) { m_mode = mode; }
-
-    // Mouse handling
-    void handleMousePress(const sf::Vector2f& worldPos);
-    void handleMouseMove(const sf::Vector2f& worldPos);
-    void handleMouseRelease(const sf::Vector2f& worldPos);
-
-    // Selection
-    std::shared_ptr<Bone> getSelectedBone() const { return m_selectedBone; }
+    // Selection management
     void setSelectedBone(std::shared_ptr<Bone> bone) { m_selectedBone = bone; }
+    std::shared_ptr<Bone> getSelectedBone() const { return m_selectedBone; }
+    void clearSelection() { m_selectedBone = nullptr; }
+    void clearInternalSelection() {m_selectedBone = nullptr; }
 
+    // Bone picking
+    std::shared_ptr<Bone> findBoneAtPosition(const sf::Vector2f& worldPos);
+    
+    // Rendering
+    void renderOverlay(sf::RenderTarget& target, float zoomLevel = 1.0f);
+    
+    // State
+    bool isCreating() const { return m_state == BoneCreationState::Creating; }
+    sf::Vector2f getCreationStart() const { return m_startPosition; }
+    sf::Vector2f getCreationEnd() const { return m_endPosition; }
+    
     // Callbacks
     void setOnBoneCreated(std::function<void(std::shared_ptr<Bone>)> callback) {
         m_onBoneCreated = callback;
     }
+    
     void setOnBoneSelected(std::function<void(std::shared_ptr<Bone>)> callback) {
         m_onBoneSelected = callback;
     }
-    void setOnBoneRotated(std::function<void(std::shared_ptr<Bone>, float)> callback) {
-        m_onBoneRotated = callback;
+
+    // Settings
+    void setMinBoneLength(float length) { m_minBoneLength = length; }
+    void setSnapToGrid(bool snap) { m_snapToGrid = snap; }
+    void setGridSize(float size) { m_gridSize = size; }
+
+    // Binding configuration
+    void setAutoBindingEnabled(bool enabled) { m_autoBindingEnabled = enabled; }
+    bool isAutoBindingEnabled() const { return m_autoBindingEnabled; }
+    
+    void setOnBoneSpriteBound(std::function<void(std::shared_ptr<Bone>, Sprite*)> callback) {
+        m_onBoneSpriteBound = callback;
     }
 
-    // Utility
-    std::shared_ptr<Bone> findBoneAtPosition(const sf::Vector2f& worldPos, float tolerance = 10.0f);
-    BoneHandle getBoneHandleAtPosition(std::shared_ptr<Bone> bone, const sf::Vector2f& worldPos, float tolerance = 15.0f);
-    void cancelCurrentOperation();
-
-    // Get creation preview for rendering
-    bool isCreating() const { return m_isCreating; }
-    sf::Vector2f getCreationStart() const { return m_creationStart; }
-    sf::Vector2f getCreationEnd() const { return m_creationEnd; }
-    
-    // Get rotation preview for rendering
-    bool isRotating() const { return m_isRotating; }
-    std::shared_ptr<Bone> getRotatingBone() const { return m_rotatingBone; }
-    float getRotationPreview() const { return m_rotationPreview; }
-
 private:
-    Rig* m_rig;
+    Character* m_character;
     bool m_isActive;
-    BoneToolMode m_mode;
     
     // Creation state
-    bool m_isCreating;
-    sf::Vector2f m_creationStart;
-    sf::Vector2f m_creationEnd;
+    BoneCreationState m_state;
+    sf::Vector2f m_startPosition;
+    sf::Vector2f m_endPosition;
     
-    // Selection state
+    // Selected bone (parent for next creation)
     std::shared_ptr<Bone> m_selectedBone;
-    sf::Vector2f m_dragOffset;
     
-    // Rotation state (NEW)
-    bool m_isRotating;
-    std::shared_ptr<Bone> m_rotatingBone;
-    sf::Vector2f m_rotationStart;
-    float m_initialRotation;
-    float m_rotationPreview;
-    BoneHandle m_grabbedHandle;
+    // Settings
+    float m_minBoneLength;
+    bool m_snapToGrid;
+    float m_gridSize;
+    
+    // Colors
+    sf::Color m_previewColor;
+    sf::Color m_validColor;
+    sf::Color m_invalidColor;
+    sf::Color m_selectedColor;
+
+    // Binding settings
+    bool m_autoBindingEnabled = true;
+    std::function<void(std::shared_ptr<Bone>, Sprite*)> m_onBoneSpriteBound;
     
     // Callbacks
     std::function<void(std::shared_ptr<Bone>)> m_onBoneCreated;
     std::function<void(std::shared_ptr<Bone>)> m_onBoneSelected;
-    std::function<void(std::shared_ptr<Bone>, float)> m_onBoneRotated;
     
-    // Helper functions
-    std::string generateBoneName();
-    float distanceToLine(const sf::Vector2f& point, const sf::Vector2f& lineStart, const sf::Vector2f& lineEnd);
-    float calculateAngle(const sf::Vector2f& center, const sf::Vector2f& point);
-    float angleDifference(float angle1, float angle2);
+    // Helper methods
+    void createBone();
+    float calculateBoneLength() const;
+    bool isValidBoneLength() const;
+    sf::Vector2f snapToGrid(const sf::Vector2f& position) const;
+    std::string generateBoneName() const;
+    bool hasRootBone() const;
+    
+    void renderBonePreview(sf::RenderTarget& target, float zoomLevel);
+    void renderSelectedBoneHighlight(sf::RenderTarget& target, float zoomLevel);
+
+    Sprite* findSpriteAtPosition(const sf::Vector2f& position);
+    void bindBoneToSprite(std::shared_ptr<Bone> bone, Sprite* sprite);
+    std::string generateBoneNameForSprite(Sprite* sprite);
 };
 
 } // namespace Riggle

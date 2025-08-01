@@ -1,6 +1,8 @@
 #pragma once
+#include <Riggle/Character.h>
+#include <Riggle/Bone.h>
 #include <SFML/Graphics.hpp>
-#include <Riggle/Rig.h>
+#include <memory>
 
 namespace Riggle {
 
@@ -9,14 +11,42 @@ public:
     BoneRenderer();
     ~BoneRenderer() = default;
 
-    // Change parameter from sf::RenderWindow& to sf::RenderTarget&
-    void render(sf::RenderTarget& target, const Rig& rig);
+    void setCharacter(Character* character) { m_character = character; }
+    
+    void render(sf::RenderTarget& target, float zoomLevel = 1.0f);
+    void renderBone(sf::RenderTarget& target, std::shared_ptr<Bone> bone, float zoomLevel);
+    void renderBoneHighlight(sf::RenderTarget& target, std::shared_ptr<Bone> bone, float zoomLevel = 1.0f);
+    
+    // Display options
+    void setShowBoneNames(bool show) { m_showBoneNames = show; }
+    void setShowJoints(bool show) { m_showJoints = show; }
+    void setBoneThickness(float thickness) { m_boneThickness = thickness; }
 
 private:
-    // Helper methods
-    void renderBone(sf::RenderTarget& target, const Bone& bone);
-    void drawBoneLine(sf::RenderTarget& target, float startX, float startY, float endX, float endY);
-    void drawJoint(sf::RenderTarget& target, float x, float y, float radius = 5.0f);
+    Character* m_character;
+    
+    // Rendering options
+    bool m_showBoneNames;
+    bool m_showJoints;
+    float m_boneThickness;
+    
+    // Colors
+    sf::Color m_boneColor;
+    sf::Color m_jointColor;
+    sf::Color m_selectedBoneColor;
+    sf::Color m_rootBoneColor;
+    
+    // Font for bone names (optional)
+    sf::Font m_font;
+    bool m_fontLoaded;
+    
+    void renderBoneLine(sf::RenderTarget& target, const sf::Vector2f& start, const sf::Vector2f& end, 
+                       const sf::Color& color, float thickness = 2.0f);
+    void renderBoneTriangle(sf::RenderTarget& target, const sf::Vector2f& start, const sf::Vector2f& end, 
+                           const sf::Color& color, float thickness, float zoomLevel = 1.0f);
+    void renderJoint(sf::RenderTarget& target, const sf::Vector2f& position, 
+                    const sf::Color& color, float radius = 5.0f);
+    void renderBoneName(sf::RenderTarget& target, std::shared_ptr<Bone> bone, const sf::Vector2f& position);
 };
 
 } // namespace Riggle
