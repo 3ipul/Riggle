@@ -357,61 +357,99 @@ void PropertyPanel::renderSpriteBindings() {
     
     if (m_selectedSprite->isBoundToBone()) {
         auto boundBone = m_selectedSprite->getBoundBone();
-        const auto& binding = m_selectedSprite->getBoneBinding();
-        
-        ImGui::Text("Bound to: %s", boundBone->getName().c_str());
-        ImGui::Text("Offset: (%.1f, %.1f)", binding.bindOffset.x, binding.bindOffset.y);
-        ImGui::Text("Rotation: %.1f°", binding.bindRotation * 180.0f / 3.14159f);
-        
-        if (ImGui::Button("Unbind from Bone")) {
-            m_selectedSprite->unbindFromBone();
-            std::cout << "Unbound sprite from bone: " << boundBone->getName() << std::endl;
+        if (boundBone && boundBone.use_count() > 0) {  // Check if bone is still valid
+            const auto& binding = m_selectedSprite->getBoneBinding();
+            
+            ImGui::Text("Bound to: %s", boundBone->getName().c_str());
+            ImGui::Text("Offset: (%.1f, %.1f)", binding.bindOffset.x, binding.bindOffset.y);
+            ImGui::Text("Rotation: %.1f°", binding.bindRotation * 180.0f / 3.14159f);
+            
+            if (ImGui::Button("Unbind from Bone")) {
+                m_selectedSprite->unbindFromBone();
+                std::cout << "Unbound sprite from bone: " << boundBone->getName() << std::endl;
+            }
+        } else {
+            ImGui::Text("Bound to invalid bone (cleaning up...)");
+            m_selectedSprite->unbindFromBone();  // Clean up invalid binding
         }
     } else {
         ImGui::Text("Not bound to any bone");
-        ImGui::Text("Use Binding Mode to bind to a bone");
     }
     
     // Quick binding section
     ImGui::Separator();
-    ImGui::Text("Quick Binding:");
+    ImGui::Text("Manual Binding:");
     
-    if (m_character && m_character->getRig()) {
-        const auto& bones = m_character->getRig()->getAllBones();
-        if (!bones.empty()) {
-            static int selectedBoneIndex = 0;
-            std::vector<const char*> boneNames;
-            boneNames.push_back("Select bone...");
+    if (!m_character || !m_character->getRig()) {
+        ImGui::Text("No rig available");
+        return;
+    }
+    
+    const auto& bones = m_character->getRig()->getAllBones();
+    if (bones.empty()) {
+        ImGui::Text("No bones available");
+        return;
+    }
+    
+    // FIXED: Use a safer approach with individual buttons instead of Combo
+    ImGui::Text("Select bone to bind:");
+    
+    // Create scrollable region for bones
+    if (ImGui::BeginChild("BoneList", ImVec2(0, 150), true)) {
+        for (size_t i = 0; i < bones.size(); ++i) {
+            const auto& bone = bones[i];
+            if (!bone || bone.use_count() == 0) continue;  // Skip invalid bones
             
-            for (const auto& bone : bones) {
-                // Show sprite count for each bone
-                std::string boneLabel = bone->getName() + " (" + std::to_string(bone->getSpriteCount()) + " sprites)";
-                boneNames.push_back(boneLabel.c_str());
-            }
+            std::string buttonLabel = bone->getName() + " (" + std::to_string(bone->getSpriteCount()) + " sprites)";
             
-            if (ImGui::Combo("##BoneSelect", &selectedBoneIndex, boneNames.data(), boneNames.size())) {
-                if (selectedBoneIndex > 0 && selectedBoneIndex <= (int)bones.size()) {
-                    auto selectedBone = bones[selectedBoneIndex - 1];
+            if (ImGui::Button(buttonLabel.c_str(), ImVec2(-1, 0))) {
+                try {
+                    // Store sprite's current transform
+                    Transform spriteTransform = m_selectedSprite->getLocalTransform();
+                    Vector2 spritePos = Vector2(spriteTransform.position.x, spriteTransform.position.y);
+                    float spriteRot = spriteTransform.rotation;
                     
-                    // Calculate binding offset based on current sprite position
-                    Transform spriteWorld = m_selectedSprite->getWorldTransform();
-                    Transform boneWorld = selectedBone->getWorldTransform();
+                    // Calculate binding offset
+                    Transform boneTransform = bone->getWorldTransform();
+                    Vector2 bonePos = Vector2(boneTransform.position.x, boneTransform.position.y);
                     
                     Vector2 offset;
-                    offset.x = spriteWorld.position.x - boneWorld.position.x;
-                    offset.y = spriteWorld.position.y - boneWorld.position.y;
+                    offset.x = spritePos.x - bonePos.x;
+                    offset.y = spritePos.y - bonePos.y;
+                    float rotationOffset = spriteRot - boneTransform.rotation;
                     
-                    float rotationOffset = spriteWorld.rotation - boneWorld.rotation;
+                    // Perform binding
+                    m_selectedSprite->bindToBone(bone, offset, rotationOffset);
                     
-                    m_selectedSprite->bindToBone(selectedBone, offset, rotationOffset);
-                    std::cout << "Bound sprite to bone: " << selectedBone->getName() << std::endl;
-                    selectedBoneIndex = 0; // Reset to "Select bone..."
+                    // Verify position didn't change
+                    Transform newTransform = m_selectedSprite->getLocalTransform();
+                    Vector2 newPos = Vector2(newTransform.position.x, newTransform.position.y);
+                    
+                    float posDiff = std::sqrt(std::pow(newPos.x - spritePos.x, 2) + 
+                                            std::pow(newPos.y - spritePos.y, 2));
+                    
+                    if (posDiff > 0.1f) {
+                        std::cout << "Warning: Manual binding changed sprite position!" << std::endl;
+                        // Correct the position
+                        Transform correctedTransform = m_selectedSprite->getLocalTransform();
+                        correctedTransform.position.x = spritePos.x;
+                        correctedTransform.position.y = spritePos.y;
+                        m_selectedSprite->setTransform(correctedTransform);
+                    }
+                    
+                    std::cout << "Manually bound sprite to bone: " << bone->getName() << std::endl;
+                    
+                } catch (const std::exception& e) {
+                    std::cout << "Error during manual binding: " << e.what() << std::endl;
                 }
             }
-        } else {
-            ImGui::Text("No bones available");
+            
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip("Click to bind sprite to this bone");
+            }
         }
     }
+    ImGui::EndChild();
 }
 
 void PropertyPanel::renderHelpDialog() {
@@ -565,26 +603,47 @@ void PropertyPanel::renderBindingControls() {
         if (m_selectedSprite->isBoundToBone()) {
             auto currentBone = m_selectedSprite->getBoundBone();
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.8f, 0.8f, 0.3f, 1.0f));
-            ImGui::Text("⚠ Sprite is bound to: %s", currentBone->getName().c_str());
+            ImGui::Text("Sprite is bound to: %s", currentBone->getName().c_str());
             ImGui::PopStyleColor();
             ImGui::Text("Binding to new bone will replace existing binding.");
         }
         
         if (ImGui::Button("Bind Sprite to Bone")) {
-            // Approach 3: Manual binding
-            Transform boneWorld = m_selectedBone->getWorldTransform();
-            Transform spriteWorld = m_selectedSprite->getWorldTransform();
-            
-            Vector2 offset;
-            offset.x = spriteWorld.position.x - boneWorld.position.x;
-            offset.y = spriteWorld.position.y - boneWorld.position.y;
-            
-            float rotationOffset = spriteWorld.rotation - boneWorld.rotation;
-            
-            m_selectedSprite->bindToBone(m_selectedBone, offset, rotationOffset);
-            
-            std::cout << "Approach 3: Manually bound sprite '" << m_selectedSprite->getName() 
-                      << "' to bone '" << m_selectedBone->getName() << "'" << std::endl;
+            // FIXED: Approach 3 - Manual binding with position preservation
+            try {
+                // Store original sprite world position
+                Transform originalSpriteWorld = m_selectedSprite->getWorldTransform();
+                Vector2 originalPos = originalSpriteWorld.position;
+                float originalRot = originalSpriteWorld.rotation;
+                
+                // Get bone world transform
+                Transform boneWorld = m_selectedBone->getWorldTransform();
+                
+                // Calculate binding offset to maintain current sprite position
+                Vector2 bindOffset;
+                bindOffset.x = originalPos.x - boneWorld.position.x;
+                bindOffset.y = originalPos.y - boneWorld.position.y;
+                
+                float bindRotation = originalRot - boneWorld.rotation;
+                
+                // Perform binding
+                m_selectedSprite->bindToBone(m_selectedBone, bindOffset, bindRotation);
+                
+                // Verify position is maintained
+                Transform newSpriteWorld = m_selectedSprite->getWorldTransform();
+                float posDiff = std::sqrt(std::pow(newSpriteWorld.position.x - originalPos.x, 2) + 
+                                        std::pow(newSpriteWorld.position.y - originalPos.y, 2));
+                
+                if (posDiff > 0.1f) {
+                    std::cout << "Warning: Manual binding changed sprite position by " << posDiff << " units" << std::endl;
+                }
+                
+                std::cout << "Approach 3: Manually bound sprite '" << m_selectedSprite->getName() 
+                          << "' to bone '" << m_selectedBone->getName() << "'" << std::endl;
+                
+            } catch (const std::exception& e) {
+                std::cout << "Error during manual binding: " << e.what() << std::endl;
+            }
         }
     }
 }

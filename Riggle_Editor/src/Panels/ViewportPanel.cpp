@@ -35,10 +35,11 @@ void ViewportPanel::render() {
     if (ImGui::Begin(getName().c_str(), &m_isVisible, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse)) {
         // Tool selection buttons (fixed height)
         renderToolButtons();
-        
+
         ImGui::Separator();
         
         // Display options (fixed height)
+        ImGui::SameLine();
         ImGui::Checkbox("Grid", &m_showGrid);
         ImGui::SameLine();
         ImGui::Checkbox("Bones", &m_showBones);
@@ -70,7 +71,12 @@ void ViewportPanel::render() {
                 if (m_viewportInitialized) {
                     renderViewport();
 
-                    // Handle interactions - this is the key fix
+                    // DRAW OVERLAY DIRECTLY ON THE VIEWPORT
+                    if (m_currentTool == ViewportTool::BoneTool) {
+                        drawBoneToolOverlay();
+                    }
+
+                    // Handle interactions
                     if (ImGui::IsItemHovered() && ImGui::IsWindowHovered()) {
                         ImVec2 mousePos = ImGui::GetMousePos();
                         ImVec2 imagePos = ImGui::GetItemRectMin();
@@ -138,43 +144,89 @@ void ViewportPanel::renderToolButtons() {
             ImGui::PopStyleColor();
         }
     }
+}
 
-    // Show bone sub-tools if Bone tool is selected
-    if (m_currentTool == ViewportTool::BoneTool && m_showBoneSubTools) {
-        ImGui::Spacing();
-        ImGui::Indent(20.0f);
-        
-        // Create Bone sub-tool
-        bool createActive = (m_currentBoneSubTool == BoneSubTool::CreateBone);
-        if (createActive) {
-            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.5f, 0.7f, 1.0f));
-        }
-        
-        if (ImGui::Button("Create Bone", ImVec2(100, 25))) {
-            setBoneSubTool(BoneSubTool::CreateBone);
-        }
-        
-        if (createActive) {
-            ImGui::PopStyleColor();
-        }
-        
-        ImGui::SameLine();
-        
-        // Transform sub-tool  
-        bool transformActive = (m_currentBoneSubTool == BoneSubTool::BoneTransform);
-        if (transformActive) {
-            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.5f, 0.7f, 1.0f));
-        }
-        
-        if (ImGui::Button("Transform", ImVec2(100, 25))) {
-            setBoneSubTool(BoneSubTool::BoneTransform);
-        }
-        
-        if (transformActive) {
-            ImGui::PopStyleColor();
-        }
-        
-        ImGui::Unindent(20.0f);
+void ViewportPanel::drawBoneToolOverlay() {
+    ImDrawList* drawList = ImGui::GetWindowDrawList();
+    ImVec2 windowPos = ImGui::GetWindowPos();
+    
+    // Position in top-left corner of viewport
+    ImVec2 overlayPos = ImVec2(windowPos.x + 5, windowPos.y + 5);
+    ImVec2 buttonSize = ImVec2(80, 20);
+    float spacing = 5.0f;
+    
+    // Draw background rectangle
+    ImVec2 bgSize = ImVec2(buttonSize.x * 2 + spacing + 10, buttonSize.y + 10);
+    drawList->AddRectFilled(
+        overlayPos, 
+        ImVec2(overlayPos.x + bgSize.x, overlayPos.y + bgSize.y),
+        IM_COL32(35, 35, 35, 220), // Dark background
+        5.0f // Rounded corners
+    );
+    
+    // Draw border
+    drawList->AddRect(
+        overlayPos, 
+        ImVec2(overlayPos.x + bgSize.x, overlayPos.y + bgSize.y),
+        IM_COL32(80, 80, 80, 255),
+        5.0f, 0, 1.0f
+    );
+    
+    
+    // Get mouse position
+    ImVec2 mousePos = ImGui::GetMousePos();
+    bool mouseClicked = ImGui::IsMouseClicked(ImGuiMouseButton_Left);
+    
+    // Create button area
+    ImVec2 createBtnPos = ImVec2(overlayPos.x + 5, overlayPos.y + 5);
+    ImVec2 createBtnMax = ImVec2(createBtnPos.x + buttonSize.x, createBtnPos.y + buttonSize.y);
+    
+    bool createActive = (m_currentBoneSubTool == BoneSubTool::CreateBone);
+    bool createHovered = (mousePos.x >= createBtnPos.x && mousePos.x <= createBtnMax.x &&
+                         mousePos.y >= createBtnPos.y && mousePos.y <= createBtnMax.y);
+    
+    // Draw create button
+    ImU32 createColor;
+    if (createActive) {
+        createColor = IM_COL32(50, 120, 180, 255);
+    } else if (createHovered) {
+        createColor = IM_COL32(90, 90, 90, 255);
+    } else {
+        createColor = IM_COL32(70, 70, 70, 255);
+    }
+    
+    drawList->AddRectFilled(createBtnPos, createBtnMax, createColor, 3.0f);
+    drawList->AddText(ImVec2(createBtnPos.x + 18, createBtnPos.y + 3), IM_COL32(255, 255, 255, 255), "Create");
+    
+    // Check create button click
+    if (createHovered && mouseClicked) {
+        setBoneSubTool(BoneSubTool::CreateBone);
+    }
+    
+    // Transform button area
+    ImVec2 transformBtnPos = ImVec2(overlayPos.x + 5 + buttonSize.x + spacing, overlayPos.y + 5);
+    ImVec2 transformBtnMax = ImVec2(transformBtnPos.x + buttonSize.x, transformBtnPos.y + buttonSize.y);
+    
+    bool transformActive = (m_currentBoneSubTool == BoneSubTool::BoneTransform);
+    bool transformHovered = (mousePos.x >= transformBtnPos.x && mousePos.x <= transformBtnMax.x &&
+                            mousePos.y >= transformBtnPos.y && mousePos.y <= transformBtnMax.y);
+    
+    // Draw transform button
+    ImU32 transformColor;
+    if (transformActive) {
+        transformColor = IM_COL32(50, 120, 180, 255);
+    } else if (transformHovered) {
+        transformColor = IM_COL32(90, 90, 90, 255);
+    } else {
+        transformColor = IM_COL32(70, 70, 70, 255);
+    }
+    
+    drawList->AddRectFilled(transformBtnPos, transformBtnMax, transformColor, 3.0f);
+    drawList->AddText(ImVec2(transformBtnPos.x + 8, transformBtnPos.y + 3), IM_COL32(255, 255, 255, 255), "Transform");
+    
+    // Check transform button click
+    if (transformHovered && mouseClicked) {
+        setBoneSubTool(BoneSubTool::BoneTransform);
     }
 }
 
@@ -184,6 +236,42 @@ void ViewportPanel::update(sf::RenderWindow& window) {
 
 void ViewportPanel::handleEvent(const sf::Event& event) {
     if (!m_viewportInitialized) return;
+
+    // Handle Ctrl key state changes
+    if (event.is<sf::Event::KeyPressed>()) {
+        const auto* keyPressed = event.getIf<sf::Event::KeyPressed>();
+        if (keyPressed && (keyPressed->code == sf::Keyboard::Key::LControl ||
+                          keyPressed->code == sf::Keyboard::Key::RControl)) {
+            
+            if (!m_ctrlHoverMode) {
+                // Entering Ctrl+hover mode
+                m_ctrlHoverMode = true;
+                m_previouslySelectedSprite = m_selectedSprite; // Remember current selection
+                std::cout << "Entered Ctrl+hover mode" << std::endl;
+            }
+        }
+    }
+    
+    if (event.is<sf::Event::KeyReleased>()) {
+        const auto* keyReleased = event.getIf<sf::Event::KeyReleased>();
+        if (keyReleased && (keyReleased->code == sf::Keyboard::Key::LControl ||
+                           keyReleased->code == sf::Keyboard::Key::RControl)) {
+            
+            if (m_ctrlHoverMode) {
+                // Exiting Ctrl+hover mode - restore previous selection
+                m_ctrlHoverMode = false;
+                m_selectedSprite = m_previouslySelectedSprite;
+                
+                // Notify about selection change
+                if (m_onSpriteSelected) {
+                    m_onSpriteSelected(m_selectedSprite);
+                }
+                
+                m_previouslySelectedSprite = nullptr;
+                std::cout << "Exited Ctrl+hover mode, restored previous selection" << std::endl;
+            }
+        }
+    }
 }
 
 void ViewportPanel::setCharacter(Character* character) {
@@ -437,6 +525,24 @@ void ViewportPanel::handleViewportInteraction(const sf::Vector2f& worldPos, cons
         float zoomFactor = wheel > 0 ? 0.9f : 1.1f;
         m_view.zoom(zoomFactor);
     }
+
+    // Handle Ctrl+hover sprite auto-selection
+    if (m_ctrlHoverMode) {
+        Sprite* hoveredSprite = getSpriteAtPosition(worldPos);
+        
+        if (hoveredSprite != m_selectedSprite) {
+            m_selectedSprite = hoveredSprite;
+            
+            // Notify about selection change (this triggers approach 2 setup)
+            if (m_onSpriteSelected) {
+                m_onSpriteSelected(m_selectedSprite);
+            }
+            
+            if (hoveredSprite) {
+                std::cout << "Ctrl+hover: Auto-selected sprite '" << hoveredSprite->getName() << "'" << std::endl;
+            }
+        }
+    }
     
     // Handle tool-specific interactions
     switch (m_currentTool) {
@@ -568,6 +674,11 @@ void ViewportPanel::handleBoneRotation(const sf::Vector2f& worldPos) {
     if (m_character && m_character->getRig()) {
         m_character->getRig()->forceUpdateWorldTransforms();
     }
+
+    // Notify controller that a bone changed (if callback is set)
+    if (m_onBoneTransformed) {
+        m_onBoneTransformed(m_selectedBone->getName());
+    }
     
     std::cout << "Rotated bone: " << m_selectedBone->getName() 
               << " to " << (currentTransform.rotation * 180.0f / 3.14159f) << "°" << std::endl;
@@ -666,6 +777,8 @@ std::shared_ptr<Bone> ViewportPanel::getBoneAtPosition(const sf::Vector2f& world
 }
 
 void ViewportPanel::setupTools() {
+    // Sprite manipulation tool
+    m_spriteTool = std::make_unique<SpriteManipulationTool>();
     if (m_spriteTool) {
         m_spriteTool->setOnSpriteSelected([this](Sprite* sprite) {
             m_selectedSprite = sprite;
@@ -673,23 +786,16 @@ void ViewportPanel::setupTools() {
                 m_onSpriteSelected(sprite);
             }
         });
-        
-        m_spriteTool->setOnSpriteDragStarted([this](Sprite* sprite) {
-            std::cout << "Sprite drag started: " << (sprite ? sprite->getName() : "null") << std::endl;
-        });
-        
-        m_spriteTool->setOnSpriteDragEnded([this](Sprite* sprite) {
-            std::cout << "Sprite drag ended: " << (sprite ? sprite->getName() : "null") << std::endl;
-        });
     }
     
+    // Bone creation tool
+    m_boneTool = std::make_unique<BoneCreationTool>();
     if (m_boneTool) {
+        
         m_boneTool->setOnBoneCreated([this](std::shared_ptr<Bone> bone) {
-            m_selectedBone = bone;
             if (m_onBoneCreated) {
                 m_onBoneCreated(bone);
             }
-            std::cout << "Bone created: " << bone->getName() << std::endl;
         });
         
         m_boneTool->setOnBoneSelected([this](std::shared_ptr<Bone> bone) {
@@ -697,7 +803,6 @@ void ViewportPanel::setupTools() {
             if (m_onBoneSelected) {
                 m_onBoneSelected(bone);
             }
-            std::cout << "Bone selected: " << (bone ? bone->getName() : "none") << std::endl;
         });
     }
     

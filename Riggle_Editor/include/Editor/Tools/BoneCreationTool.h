@@ -60,14 +60,6 @@ public:
     void setSnapToGrid(bool snap) { m_snapToGrid = snap; }
     void setGridSize(float size) { m_gridSize = size; }
 
-    // Binding configuration
-    void setAutoBindingEnabled(bool enabled) { m_autoBindingEnabled = enabled; }
-    bool isAutoBindingEnabled() const { return m_autoBindingEnabled; }
-    
-    void setOnBoneSpriteBound(std::function<void(std::shared_ptr<Bone>, Sprite*)> callback) {
-        m_onBoneSpriteBound = callback;
-    }
-
 private:
     Character* m_character;
     bool m_isActive;
@@ -90,10 +82,6 @@ private:
     sf::Color m_validColor;
     sf::Color m_invalidColor;
     sf::Color m_selectedColor;
-
-    // Binding settings
-    bool m_autoBindingEnabled = true;
-    std::function<void(std::shared_ptr<Bone>, Sprite*)> m_onBoneSpriteBound;
     
     // Callbacks
     std::function<void(std::shared_ptr<Bone>)> m_onBoneCreated;
@@ -109,10 +97,6 @@ private:
     
     void renderBonePreview(sf::RenderTarget& target, float zoomLevel);
     void renderSelectedBoneHighlight(sf::RenderTarget& target, float zoomLevel);
-
-    Sprite* findSpriteAtPosition(const sf::Vector2f& position);
-    void bindBoneToSprite(std::shared_ptr<Bone> bone, Sprite* sprite);
-    std::string generateBoneNameForSprite(Sprite* sprite);
 };
 
 } // namespace Riggle

@@ -5,7 +5,32 @@
 namespace Riggle {
 
 Character::Character(const std::string& name) 
-    : m_name(name), m_autoUpdate(true) {
+    : m_name(name), m_autoUpdate(true), m_manualBoneEditMode(false) {
+}
+
+void Character::notifyTransformChanged(const std::string& boneName, const Transform& oldTransform, const Transform& newTransform) {
+    // Only notify during manual edit mode (when Editor is manipulating bones)
+    if (!m_manualBoneEditMode) {
+        return;
+    }
+    
+    TransformEvent event{
+        boneName, 
+        oldTransform, 
+        newTransform, 
+        getCurrentTime()
+    };
+    
+    for (auto& handler : m_transformHandlers) {
+        handler(event);
+    }
+}
+
+float Character::getCurrentTime() const {
+    static auto startTime = std::chrono::steady_clock::now();
+    auto now = std::chrono::steady_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now - startTime);
+    return duration.count() / 1000.0f;
 }
 
 void Character::addSprite(std::unique_ptr<Sprite> sprite) {
@@ -70,6 +95,12 @@ Sprite* Character::findSprite(const std::string& name) {
 
 void Character::setRig(std::unique_ptr<Rig> rig) {
     m_rig = std::move(rig);
+
+    // Set character reference in rig
+    if (m_rig) {
+        m_rig->setCharacter(this);
+    }
+
     if (m_autoUpdate) {
         updateDeformations();
     }

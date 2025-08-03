@@ -15,9 +15,7 @@ EditorController::EditorController()
     , m_shouldExit(false)
     , m_hasUnsavedChanges(false)
 {
-    createDefaultCharacter();
     initializePanels();
-    setupPanelCallbacks();
 }
 
 void EditorController::update(sf::RenderWindow& window) {
@@ -53,6 +51,10 @@ void EditorController::render(sf::RenderWindow& window) {
     
     if (m_propertyPanel) {
         m_propertyPanel->render();
+    }
+
+    if (m_animationPanel) {
+        m_animationPanel->render();
     }
 
     renderAssetHierarchyTabs();
@@ -150,14 +152,13 @@ void EditorController::initializePanels() {
     auto propertyPanel = std::make_unique<PropertyPanel>();
     m_propertyPanel = propertyPanel.get();
     m_panels.push_back(std::move(propertyPanel));
-    
-    // Set character to all panels
-    if (m_character) {
-        m_viewportPanel->setCharacter(m_character.get());
-        m_assetPanel->setCharacter(m_character.get());
-        m_hierarchyPanel->setCharacter(m_character.get());
-        m_propertyPanel->setCharacter(m_character.get());
-    }
+
+    // Animation panel
+    auto animationPanel = std::make_unique<AnimationPanel>();
+    m_animationPanel = animationPanel.get();
+    m_panels.push_back(std::move(animationPanel));
+
+    createDefaultCharacter();
     
     // Connect asset panels
     m_assetPanel->setAssetBrowserPanel(m_assetBrowserPanel);
@@ -225,46 +226,143 @@ void EditorController::setupPanelCallbacks() {
     m_viewportPanel->setOnBoneSelected([this](std::shared_ptr<Bone> bone) {
         updateSelectionState(nullptr, bone);
     });
-    
-    // Bone creation callback for approach 2
+
     m_viewportPanel->setOnBoneCreated([this](std::shared_ptr<Bone> bone) {
-        // Check if we should bind to selected sprite (approach 2)
-        if (m_selectedSprite && bone) {
-        // Only do approach 2 binding if approach 1 didn't already happen
-        if (!bone->getSpriteCount()) {  // Bone not already bound by approach 1
-            // Calculate binding offset
-            Transform boneWorld = bone->getWorldTransform();
-            Transform spriteWorld = m_selectedSprite->getWorldTransform();
+        if (!bone) return;
+        
+        std::cout << "Created bone: " << bone->getName() << std::endl;
+        
+        // APPROACH 1: Ctrl+hover auto-binding
+        // Check if we're in Ctrl+hover mode and have a selected sprite
+        if (m_viewportPanel->isInCtrlHoverMode() && m_selectedSprite && bone->getSpriteCount() == 0) {
+            std::cout << "Approach 1: Ctrl+hover auto-binding..." << std::endl;
             
-            Vector2 offset;
-            offset.x = spriteWorld.position.x - boneWorld.position.x;
-            offset.y = spriteWorld.position.y - boneWorld.position.y;
-            
-            float rotationOffset = spriteWorld.rotation - boneWorld.rotation;
-            
-            m_selectedSprite->bindToBone(bone, offset, rotationOffset);
-            
-            std::cout << "Approach 2: Bound selected sprite '" << m_selectedSprite->getName() 
-                      << "' to new bone '" << bone->getName() << "'" << std::endl;
-            
-            // Update bone name to follow naming convention if not already named
-            if (bone->getName().find("_bone") == std::string::npos) {
-                std::string newBoneName = m_selectedSprite->getName() + "_bone";
+            try {
+                // Store original sprite position
+                Transform originalSpriteWorld = m_selectedSprite->getWorldTransform();
+                Vector2 originalSpritePos = originalSpriteWorld.position;
+                float originalSpriteRot = originalSpriteWorld.rotation;
+                
+                // Get bone world transform
+                Transform boneWorld = bone->getWorldTransform();
+                Vector2 bonePos = boneWorld.position;
+                
+                // Calculate binding offset
+                Vector2 bindOffset;
+                bindOffset.x = originalSpritePos.x - bonePos.x;
+                bindOffset.y = originalSpritePos.y - bonePos.y;
+                float bindRotation = originalSpriteRot - boneWorld.rotation;
+                
+                // APPROACH 1: Set sprite-based bone name
+                std::string newBoneName = m_selectedSprite->getName();
+                size_t dotPos = newBoneName.find_last_of('.');
+                if (dotPos != std::string::npos) {
+                    newBoneName = newBoneName.substr(0, dotPos);
+                }
+                newBoneName += "_bone";
                 bone->setName(newBoneName);
+                
+                // Bind sprite to bone
+                m_selectedSprite->bindToBone(bone, bindOffset, bindRotation);
+                
+                std::cout << "Approach 1: Auto-bound sprite '" << m_selectedSprite->getName() 
+                          << "' to bone '" << bone->getName() << "'" << std::endl;
+                
+            } catch (const std::exception& e) {
+                std::cout << "Error during approach 1 binding: " << e.what() << std::endl;
             }
-        } else {
-            std::cout << "Approach 1 already bound this bone, skipping approach 2" << std::endl;
+        }
+        // APPROACH 2: Selected sprite from asset panel (normal mode, not Ctrl+hover)
+        else if (!m_viewportPanel->isInCtrlHoverMode() && m_selectedSprite && bone->getSpriteCount() == 0) {
+            std::cout << "Approach 2: Asset panel selection binding..." << std::endl;
+            
+            try {
+                // Store original sprite position
+                Transform originalSpriteWorld = m_selectedSprite->getWorldTransform();
+                Vector2 originalSpritePos = originalSpriteWorld.position;
+                float originalSpriteRot = originalSpriteWorld.rotation;
+                
+                // Get bone world transform
+                Transform boneWorld = bone->getWorldTransform();
+                Vector2 bonePos = boneWorld.position;
+                
+                // Calculate binding offset
+                Vector2 bindOffset;
+                bindOffset.x = originalSpritePos.x - bonePos.x;
+                bindOffset.y = originalSpritePos.y - bonePos.y;
+                float bindRotation = originalSpriteRot - boneWorld.rotation;
+                
+                // APPROACH 2: Set sprite-based bone name
+                std::string newBoneName = m_selectedSprite->getName();
+                size_t dotPos = newBoneName.find_last_of('.');
+                if (dotPos != std::string::npos) {
+                    newBoneName = newBoneName.substr(0, dotPos);
+                }
+                newBoneName += "_bone";
+                bone->setName(newBoneName);
+                
+                // Bind sprite to bone
+                m_selectedSprite->bindToBone(bone, bindOffset, bindRotation);
+                
+                std::cout << "Approach 2: Bound selected sprite '" << m_selectedSprite->getName() 
+                          << "' to new bone '" << bone->getName() << "'" << std::endl;
+                
+            } catch (const std::exception& e) {
+                std::cout << "Error during approach 2 binding: " << e.what() << std::endl;
+            }
+        }
+        // APPROACH 3: Manual binding (no auto-binding, keep original bone name)
+        else {
+            std::cout << "Approach 3: Manual binding (bone name unchanged)" << std::endl;
         }
         
-        // Keep multi-selection after binding
-        updateSelectionState(m_selectedSprite, bone);
-    } else {
-        // Normal bone creation - just select the bone
-        updateSelectionState(nullptr, bone);
-    }
-    
-    m_hasUnsavedChanges = true;
+        // Update selection state
+        if (m_selectedSprite && bone) {
+            updateSelectionState(m_selectedSprite, bone);
+        } else {
+            updateSelectionState(nullptr, bone);
+        }
+        
+        m_hasUnsavedChanges = true;
     });
+
+    // Connect bone rotation to animation recording
+    m_viewportPanel->setOnBoneRotated([this](std::shared_ptr<Bone> bone, float rotation) {
+        // Record keyframe when bone is rotated during recording
+        if (m_animationPanel && m_animationPanel->isRecording()) {
+            auto* player = m_character->getAnimationPlayer();
+            auto* currentAnim = player->getAnimation();
+            if (currentAnim && bone) {
+                float currentTime = m_animationPanel->getCurrentTime();
+                Transform transform = bone->getLocalTransform();
+                currentAnim->addKeyframe(bone->getName(), currentTime, transform);
+                std::cout << "Recorded keyframe for " << bone->getName() << " at time " << currentTime << std::endl;
+            }
+        }
+        m_hasUnsavedChanges = true;
+    });
+
+    // m_viewportPanel->setOnBoneTransformed([this](const std::string& boneName) {
+    //         // Check if we should auto-keyframe
+    //         if (m_animationPanel && m_animationPanel->isRecording() && m_animationPanel->isAutoKeyEnabled()) {
+    //             m_animationPanel->createKeyframeForBone(boneName);
+    //         }
+    // });
+
+    // Setup transform event handler for auto-keyframing
+    if (m_character) {
+        m_character->addTransformEventHandler([this](const Character::TransformEvent& event) {
+            // Check if we should auto-keyframe
+            if (m_animationPanel && m_animationPanel->isRecording() && m_animationPanel->isAutoKeyEnabled()) {
+                
+                m_animationPanel->createKeyframeForBone(event.boneName);
+                std::cout << "Auto-keyed bone: " << event.boneName << " at time " << event.timestamp << std::endl;
+            }
+        });
+    }
+
+    std::cout << "Panel callbacks setup complete" << std::endl;
+
 }
 
 void EditorController::onAssetSelected(const AssetInfo& asset) {
@@ -428,6 +526,15 @@ void EditorController::createDefaultCharacter() {
     m_character = std::make_unique<Character>("Default Character");
     auto rig = std::make_unique<Rig>("Default Rig");
     m_character->setRig(std::move(rig));
+
+    // Update all panels with new character
+    if (m_viewportPanel) m_viewportPanel->setCharacter(m_character.get());
+    if (m_assetPanel) m_assetPanel->setCharacter(m_character.get());
+    if (m_hierarchyPanel) m_hierarchyPanel->setCharacter(m_character.get());
+    if (m_propertyPanel) m_propertyPanel->setCharacter(m_character.get());
+    if (m_animationPanel) m_animationPanel->setCharacter(m_character.get());
+
+    setupPanelCallbacks();
     
     std::cout << "Created default character with rig" << std::endl;
 }
@@ -672,6 +779,9 @@ void EditorController::newProject() {
     if (m_propertyPanel) {
         m_propertyPanel->setCharacter(m_character.get());
         m_propertyPanel->clearSelection();
+    }
+    if (m_animationPanel) {
+        m_animationPanel->setCharacter(m_character.get());
     }
     
     m_hasUnsavedChanges = false;

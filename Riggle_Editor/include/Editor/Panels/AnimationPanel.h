@@ -54,7 +54,9 @@ public:
     
     void setRecording(bool recording) { m_state.isRecording = recording; }
     bool isRecording() const { return m_state.isRecording; }
-
+    bool isAutoKeyEnabled() const { return m_state.autoKeyframe; }
+    void createKeyframeForBone(const std::string& boneName);
+    
 private:
     Character* m_character;
     TimelineState m_state;

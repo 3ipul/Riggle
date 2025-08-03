@@ -22,14 +22,17 @@ Transform Sprite::getWorldTransform() const {
         // Apply binding offset and rotation
         Transform result;
         
-        // FIXED: Position calculation using Vector2
+        // FIXED: Position calculation using proper offset transformation
         float cosRot = std::cos(boneWorld.rotation);
         float sinRot = std::sin(boneWorld.rotation);
         
-        result.position.x = boneWorld.position.x + 
-            (m_binding.bindOffset.x * cosRot - m_binding.bindOffset.y * sinRot) * boneWorld.scale.x;
-        result.position.y = boneWorld.position.y + 
-            (m_binding.bindOffset.x * sinRot + m_binding.bindOffset.y * cosRot) * boneWorld.scale.y;
+        // Transform binding offset by bone's rotation and scale
+        float rotatedOffsetX = m_binding.bindOffset.x * cosRot - m_binding.bindOffset.y * sinRot;
+        float rotatedOffsetY = m_binding.bindOffset.x * sinRot + m_binding.bindOffset.y * cosRot;
+        
+        // Apply bone scale to the rotated offset
+        result.position.x = boneWorld.position.x + (rotatedOffsetX * boneWorld.scale.x);
+        result.position.y = boneWorld.position.y + (rotatedOffsetY * boneWorld.scale.y);
         
         // Rotation: bone rotation + binding rotation
         result.rotation = boneWorld.rotation + m_binding.bindRotation;
@@ -38,9 +41,12 @@ Transform Sprite::getWorldTransform() const {
         result.scale.x = boneWorld.scale.x * m_localTransform.scale.x;
         result.scale.y = boneWorld.scale.y * m_localTransform.scale.y;
         
+        // Length (if applicable)
+        result.length = m_localTransform.length;
+        
         return result;
     } else {
-        // Use local transform directly
+        // Use local transform as world transform
         return m_localTransform;
     }
 }
@@ -59,7 +65,18 @@ void Sprite::bindToBone(std::shared_ptr<Bone> bone, const Vector2& offset, float
     // Set new binding
     m_binding.bone = bone;
     m_binding.weight = 1.0f;  // Always full weight for single binding
-    m_binding.bindOffset = offset;
+
+    // The provided offset and rotation are in world space. We need to convert
+    // them to be relative to the bone's world transform.
+    Transform boneWorld = bone->getWorldTransform();
+    float cosRot = std::cos(-boneWorld.rotation);
+    float sinRot = std::sin(-boneWorld.rotation);
+
+    // Rotate the world offset to the bone's local space
+    m_binding.bindOffset.x = (offset.x * cosRot - offset.y * sinRot) / boneWorld.scale.x;
+    m_binding.bindOffset.y = (offset.x * sinRot + offset.y * cosRot) / boneWorld.scale.y;
+    
+    // Rotation is relative to the bone's rotation
     m_binding.bindRotation = rotation;
     
     // Add this sprite to the bone's sprite list

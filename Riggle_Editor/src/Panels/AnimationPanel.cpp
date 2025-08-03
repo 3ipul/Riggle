@@ -108,6 +108,16 @@ void AnimationPanel::renderAnimationControls() {
                 ImGui::SameLine();
                 ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), " <o>");
             }
+            else{
+                ImGui::SameLine();
+                ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 0.0f), " <o>");
+            }
+        }
+        else {
+            ImGui::SameLine();
+            ImGui::TextColored(ImVec4(0.0f, 0.0f, 0.0f, 0.0f), "REC");
+            ImGui::SameLine();
+            ImGui::TextColored(ImVec4(0.0f, 0.0f, 0.0f, 0.0f), " <o>");
         }
         
         // Auto-key option
@@ -237,24 +247,24 @@ void AnimationPanel::renderTimeline() {
 void AnimationPanel::toggleRecording() {
     m_state.isRecording = !m_state.isRecording;
     
-    if (!m_state.isRecording) {
+    if (m_state.isRecording) {
+        // Enable manual bone edit mode during recording
+        if (m_character) {
+            m_character->setManualBoneEditMode(true);
+        }
+
+        std::cout << "Recording started" << std::endl;
+        
+        if (m_state.autoKeyframe && m_state.currentTime <= 0.0f) {
+            keyAllBones();
+        }
+
+    } else {
+        // Disable manual bone edit mode when stopping recording
+        if (m_character) {
+            m_character->setManualBoneEditMode(false);
+        }
         std::cout << "Recording stopped" << std::endl;
-        return;
-    }
-    
-    // Starting recording
-    auto* currentAnim = m_character->getAnimationPlayer()->getAnimation();
-    if (!currentAnim) {
-        std::cout << "No animation selected for recording!" << std::endl;
-        m_state.isRecording = false;
-        return;
-    }
-    
-    std::cout << "Recording started on animation: " << currentAnim->getName() << std::endl;
-    
-    // If auto-key is enabled, create keyframes for all bones at current time
-    if (m_state.autoKeyframe) {
-        keyAllBones();
     }
 }
 
@@ -615,35 +625,43 @@ void AnimationPanel::addKeyframeAtCurrentTime(const std::string& boneName, Anima
     std::cout << "Added keyframe for bone '" << boneName << "' at time " << m_state.currentTime << std::endl;
 }
 
-void AnimationPanel::setCurrentTime(float time) {
-    m_state.currentTime = time;
-    
-    if (m_character) {
-        auto* player = m_character->getAnimationPlayer();
-        auto* currentAnim = player->getAnimation();
-        
-        // CRITICAL: During recording, handle time differently
-        if (m_state.isRecording) {
-            // Enable manual bone edit mode to prevent animation overwrites
-            m_character->setManualBoneEditMode(true);
-            
-            if (currentAnim) {
-                float animDuration = currentAnim->getDuration();
-                
-                // If seeking beyond last keyframe, hold the last frame
-                if (time > animDuration) {
-                    // Apply last keyframe values to all bones
-                    applyLastKeyframeToAllBones(currentAnim);
-                } else {
-                    // Normal animation playback for recorded portion
-                    player->setTime(time);
-                }
-            }
-        } else {
-            // Normal playback mode
-            m_character->setManualBoneEditMode(false);
-            player->setTime(time);
+void AnimationPanel::createKeyframeForBone(const std::string& boneName) {
+    if (!m_character) {
+        std::cout << "No character available for keyframing" << std::endl;
+        return;
+    }
+    auto* currentAnim = m_character->getAnimationPlayer()->getAnimation();
+    if (currentAnim && m_character && m_character->getRig()) {
+        auto bone = m_character->getRig()->findBone(boneName);
+        if (bone) {
+            addKeyframeAtCurrentTime(boneName, currentAnim);
         }
+    }
+}
+
+void AnimationPanel::setCurrentTime(float time) {
+    if (time < 0.0f) time = 0.0f;
+    m_state.currentTime = std::max(0.0f, time);
+    
+    // DISABLE manual edit mode during playhead updates
+    bool wasInManualMode = false;
+    if (m_character && m_character->isInManualBoneEditMode()) {
+        wasInManualMode = true;
+        m_character->setManualBoneEditMode(false);
+    }
+    
+    // Apply animation at current time
+    if (m_character && m_character->getAnimationPlayer()) {
+        auto* currentAnim = m_character->getAnimationPlayer()->getAnimation();
+        if (currentAnim) {
+            m_character->getAnimationPlayer()->setTime(m_state.currentTime);
+            m_character->getAnimationPlayer()->update(0.0f); // Force update
+        }
+    }
+    
+    // RESTORE manual edit mode if it was enabled
+    if (wasInManualMode && m_character) {
+        m_character->setManualBoneEditMode(true);
     }
 }
 

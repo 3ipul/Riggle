@@ -51,6 +51,7 @@ public:
     void resetView();
     sf::View& getView() { return m_view; }
     float getZoomLevel() const;
+    bool isInCtrlHoverMode() const { return m_ctrlHoverMode; }
 
     // Callbacks
     void setOnSpriteSelected(std::function<void(Sprite*)> callback) {
@@ -61,8 +62,12 @@ public:
         m_onBoneSelected = callback;
     }
     
-    void setOnBoneCreated(std::function<void(std::shared_ptr<Bone>)> callback) {
+    void setOnBoneCreated(const std::function<void(std::shared_ptr<Bone>)>& callback) {
         m_onBoneCreated = callback;
+    }
+
+    void setOnBoneRotated(std::function<void(std::shared_ptr<Bone>, float)> callback) {
+        m_onBoneRotated = callback;
     }
 
 private:
@@ -92,6 +97,10 @@ private:
     Sprite* m_selectedSprite;
     std::shared_ptr<Bone> m_selectedBone;
 
+     // For Ctrl+hover functionality
+    bool m_ctrlHoverMode = false;
+    Sprite* m_previouslySelectedSprite = nullptr; // To restore selection when Ctrl released
+
     // Display options
     bool m_showGrid;
     bool m_showBones;
@@ -101,13 +110,16 @@ private:
     std::function<void(Sprite*)> m_onSpriteSelected;
     std::function<void(std::shared_ptr<Bone>)> m_onBoneSelected;
     std::function<void(std::shared_ptr<Bone>)> m_onBoneCreated;
-
+    std::function<void(std::shared_ptr<Bone>, float)> m_onBoneRotated;
+    std::function<void(const std::string&)> m_onBoneTransformed;
+    
     // Rendering
     void renderToolButtons();
     void renderViewport();
     void renderScene(sf::RenderTarget& target);
     void renderGrid(sf::RenderTarget& target);
     void renderToolOverlays(sf::RenderTarget& target);
+    void drawBoneToolOverlay();
 
     // Interaction
     void handleViewportInteraction(const sf::Vector2f& worldPos, const sf::Vector2f& screenPos);

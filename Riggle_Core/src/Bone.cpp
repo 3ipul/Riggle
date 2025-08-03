@@ -1,5 +1,6 @@
 #include "Riggle/Bone.h"
 #include "Riggle/Sprite.h"
+#include "Riggle/Character.h"
 #include <algorithm>
 #include <functional>
 #include <iostream>
@@ -16,6 +17,8 @@ Bone::Bone(const std::string& name, float length)
 }
 
 void Bone::setLocalTransform(const Transform& transform) {
+    Transform oldTransform = m_localTransform;
+    
     m_localTransform = transform;
     m_localTransform.length = m_length;  // Keep length consistent
     markWorldTransformDirty();
@@ -30,6 +33,9 @@ void Bone::setLocalTransform(const Transform& transform) {
     };
     
     markDescendants(shared_from_this());
+    
+    // Notify character of transform change
+    notifyCharacterOfTransformChange(oldTransform, m_localTransform);
 }
 
 Transform Bone::getWorldTransform() const {
@@ -75,6 +81,8 @@ void Bone::updateWorldTransform() const {
 
 void Bone::setLength(float length) {
     if (m_length != length) {
+        Transform oldTransform = m_localTransform;
+        
         m_length = length;
         m_localTransform.length = length;  // Keep transform in sync
         markWorldTransformDirty();
@@ -83,6 +91,15 @@ void Bone::setLength(float length) {
         for (auto& child : m_children) {
             child->markWorldTransformDirty();
         }
+        
+        // Notify character of transform change
+        notifyCharacterOfTransformChange(oldTransform, m_localTransform);
+    }
+}
+
+void Bone::notifyCharacterOfTransformChange(const Transform& oldTransform, const Transform& newTransform) {
+    if (m_character) {
+        m_character->notifyTransformChanged(m_name, oldTransform, newTransform);
     }
 }
 

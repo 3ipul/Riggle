@@ -65,13 +65,14 @@ void BoneCreationTool::handleMouseReleased(const sf::Vector2f& worldPos) {
     
     m_endPosition = m_snapToGrid ? snapToGrid(worldPos) : worldPos;
     
-    if (isValidBoneLength()) {
-        createBone();
-    } else {
-        std::cout << "Bone too short, minimum length: " << m_minBoneLength << std::endl;
-    }
-    
+    // CRITICAL: Reset state FIRST to prevent re-entry
+    BoneCreationState oldState = m_state;
     m_state = BoneCreationState::Idle;
+    
+    // Only create bone if we were actually creating one
+    if (oldState == BoneCreationState::Creating && isValidBoneLength()) {
+        createBone();
+    }
 }
 
 std::shared_ptr<Bone> BoneCreationTool::findBoneAtPosition(const sf::Vector2f& worldPos) {
@@ -123,69 +124,20 @@ void BoneCreationTool::renderOverlay(sf::RenderTarget& target, float zoomLevel) 
     if (m_state == BoneCreationState::Creating) {
         renderBonePreview(target, zoomLevel);
     }
-
-    // Show auto-binding preview when Ctrl is held
-    if (m_autoBindingEnabled && m_state == BoneCreationState::Creating) {
-        bool ctrlPressed = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::LControl) || 
-                           sf::Keyboard::isKeyPressed(sf::Keyboard::Key::RControl);
-        
-        if (ctrlPressed) {
-            Sprite* targetSprite = findSpriteAtPosition(m_startPosition);
-            if (targetSprite) {
-                // Highlight the sprite that would be bound
-                Transform spriteTransform = targetSprite->getWorldTransform();
-                sf::Vector2f spritePos(spriteTransform.position.x, spriteTransform.position.y);
-                
-                // Draw binding preview
-                sf::CircleShape bindingIndicator(20.0f / zoomLevel);
-                bindingIndicator.setFillColor(sf::Color::Transparent);
-                bindingIndicator.setOutlineThickness(3.0f / zoomLevel);
-                bindingIndicator.setOutlineColor(sf::Color(0, 255, 255, 200)); // Cyan
-                bindingIndicator.setOrigin(sf::Vector2f(20.0f / zoomLevel, 20.0f / zoomLevel));
-                bindingIndicator.setPosition(spritePos);
-                
-                target.draw(bindingIndicator);
-            }
-        }
-    }
 }
 
 void BoneCreationTool::createBone() {
-    if (!m_character) {
-        std::cout << "Error: No character set for bone creation" << std::endl;
-        return;
-    }
+    if (!m_character) return;
     
-    // Ensure character has a rig
     if (!m_character->getRig()) {
         auto newRig = std::make_unique<Rig>("CharacterRig");
         m_character->setRig(std::move(newRig));
-        std::cout << "Created new rig for character" << std::endl;
     }
     
     float length = calculateBoneLength();
-    Sprite* targetSprite = nullptr;
-    std::string boneName;
+    std::string boneName = generateBoneName();
     
-    // Check for auto-binding with Ctrl key
-    bool ctrlPressed = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::LControl) || 
-                       sf::Keyboard::isKeyPressed(sf::Keyboard::Key::RControl);
-    
-    if (m_autoBindingEnabled && ctrlPressed) {
-        // Approach 1: Auto-detect sprite behind bone start position
-        targetSprite = findSpriteAtPosition(m_startPosition);
-        if (targetSprite) {
-            boneName = generateBoneNameForSprite(targetSprite);
-            std::cout << "Auto-detected sprite for binding: " << targetSprite->getName() << std::endl;
-        }
-    }
-    
-    // If no auto-binding name was set, use normal naming
-    if (boneName.empty()) {
-        boneName = generateBoneName();
-    }
-    
-    // Create bone with calculated name
+    // Create bone
     std::shared_ptr<Bone> newBone;
     if (!hasRootBone()) {
         newBone = m_character->getRig()->createBone(boneName, length);
@@ -195,143 +147,50 @@ void BoneCreationTool::createBone() {
         newBone = m_character->getRig()->createBone(boneName, length);
     }
     
-    if (!newBone) {
-        std::cout << "Failed to create bone!" << std::endl;
-        return;
-    }
+    if (!newBone) return;
     
     // Set bone transform
     Transform boneTransform;
     
     if (m_selectedBone && newBone->getParent()) {
-        // Child bone - calculate local transform relative to parent
         Transform parentWorld = m_selectedBone->getWorldTransform();
-        
-        // Calculate world direction vector for the new bone
         sf::Vector2f worldDirection = m_endPosition - m_startPosition;
         float worldRotation = std::atan2(worldDirection.y, worldDirection.x);
-        
-        // Convert world position to local position relative to parent
         sf::Vector2f worldOffset = m_startPosition - sf::Vector2f(parentWorld.position.x, parentWorld.position.y);
         
-        // Rotate offset by negative parent rotation to get local coordinates
         float cosParentRot = std::cos(-parentWorld.rotation);
         float sinParentRot = std::sin(-parentWorld.rotation);
         
         boneTransform.position.x = (worldOffset.x * cosParentRot - worldOffset.y * sinParentRot) / parentWorld.scale.x;
         boneTransform.position.y = (worldOffset.x * sinParentRot + worldOffset.y * cosParentRot) / parentWorld.scale.y;
-        
-        // Local rotation = world rotation - parent rotation
         boneTransform.rotation = worldRotation - parentWorld.rotation;
         
-        // Normalize rotation to [-PI, PI]
         while (boneTransform.rotation > 3.14159f) boneTransform.rotation -= 2.0f * 3.14159f;
         while (boneTransform.rotation < -3.14159f) boneTransform.rotation += 2.0f * 3.14159f;
-        
     } else {
-        // Root or independent bone - use world coordinates directly
         boneTransform.position.x = m_startPosition.x;
         boneTransform.position.y = m_startPosition.y;
-        
-        // Calculate rotation from start to end
         sf::Vector2f direction = m_endPosition - m_startPosition;
         boneTransform.rotation = std::atan2(direction.y, direction.x);
     }
     
-    // Set scale (always 1.0 for now)
     boneTransform.scale.x = 1.0f;
     boneTransform.scale.y = 1.0f;
-    
-    // Set length in transform (for consistency)
     boneTransform.length = length;
-    
-    newBone->setLocalTransform(boneTransform);
-    
-    // Force update transforms
-    m_character->getRig()->forceUpdateWorldTransforms();
 
-    // Perform auto-binding if sprite was detected 
-    if (targetSprite && ctrlPressed) {
-        bindBoneToSprite(newBone, targetSprite);
-    }
+    newBone->setLocalTransform(boneTransform);
+    m_character->getRig()->forceUpdateWorldTransforms();
     
-    // Auto-select the newly created bone
+    // Set as selected
     m_selectedBone = newBone;
     
-    std::cout << "Created bone: " << boneName 
-              << " (length: " << length 
-              << ", local rotation: " << (boneTransform.rotation * 180.0f / 3.14159f) << "°)" << std::endl;
-
-    // Notify callbacks
+    // Call callbacks
     if (m_onBoneCreated) {
         m_onBoneCreated(newBone);
     }
-    
     if (m_onBoneSelected) {
         m_onBoneSelected(newBone);
     }
-}
-
-Sprite* BoneCreationTool::findSpriteAtPosition(const sf::Vector2f& position) {
-    if (!m_character) return nullptr;
-    
-    const auto& sprites = m_character->getSprites();
-    for (auto it = sprites.rbegin(); it != sprites.rend(); ++it) {
-        const auto& sprite = *it;
-        if (!sprite->isVisible() || sprite->isBoundToBone()) continue;
-        
-        // Simple bounding box check - reuse viewport logic
-        Transform worldTransform = sprite->getWorldTransform();
-        
-        // Use default sprite size for now (you can enhance this later)
-        float halfWidth = 32.0f * worldTransform.scale.x;
-        float halfHeight = 32.0f * worldTransform.scale.y;
-        
-        float left = worldTransform.position.x - halfWidth;
-        float right = worldTransform.position.x + halfWidth;
-        float top = worldTransform.position.y - halfHeight;
-        float bottom = worldTransform.position.y + halfHeight;
-        
-        if (position.x >= left && position.x <= right &&
-            position.y >= top && position.y <= bottom) {
-            return sprite.get();
-        }
-    }
-    return nullptr;
-}
-
-void BoneCreationTool::bindBoneToSprite(std::shared_ptr<Bone> bone, Sprite* sprite) {
-    if (!bone || !sprite) return;
-    
-    // Calculate binding offset
-    Transform boneWorld = bone->getWorldTransform();
-    Transform spriteWorld = sprite->getWorldTransform();
-    
-    Vector2 offset;
-    offset.x = spriteWorld.position.x - boneWorld.position.x;
-    offset.y = spriteWorld.position.y - boneWorld.position.y;
-    
-    float rotationOffset = spriteWorld.rotation - boneWorld.rotation;
-    
-    sprite->bindToBone(bone, offset, rotationOffset);
-    
-    std::cout << "Auto-bound sprite '" << sprite->getName() 
-              << "' to bone '" << bone->getName() << "'" << std::endl;
-    
-    if (m_onBoneSpriteBound) {
-        m_onBoneSpriteBound(bone, sprite);
-    }
-}
-
-std::string BoneCreationTool::generateBoneNameForSprite(Sprite* sprite) {
-    if (!sprite) return generateBoneName();
-    
-    std::string spriteName = sprite->getName();
-    if (spriteName.empty()) {
-        spriteName = "Sprite";
-    }
-    
-    return spriteName + "_bone";
 }
 
 float BoneCreationTool::calculateBoneLength() const {

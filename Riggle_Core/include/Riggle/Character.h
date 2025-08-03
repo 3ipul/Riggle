@@ -6,6 +6,9 @@
 #include <vector>
 #include <memory>
 #include <string>
+#include <functional>
+#include <chrono>
+
 
 namespace Riggle {
 
@@ -13,6 +16,24 @@ class Character {
 public:
     Character(const std::string& name);
     ~Character() = default;
+
+    // Event system for transform changes
+    struct TransformEvent {
+        std::string boneName;
+        Transform oldTransform;
+        Transform newTransform;
+        float timestamp;
+    };
+    
+    using TransformEventHandler = std::function<void(const TransformEvent&)>;
+    
+    void addTransformEventHandler(TransformEventHandler handler) {
+        m_transformHandlers.push_back(handler);
+    }
+    
+    void clearTransformEventHandlers() {
+        m_transformHandlers.clear();
+    }
 
     // Basic properties
     const std::string& getName() const { return m_name; }
@@ -62,9 +83,17 @@ private:
     std::vector<std::unique_ptr<Sprite>> m_sprites;
     std::unique_ptr<Rig> m_rig;
     std::vector<std::unique_ptr<Animation>> m_animations;
+    std::vector<TransformEventHandler> m_transformHandlers;
     AnimationPlayer m_animationPlayer;
     bool m_autoUpdate = true; // Auto-update deformations
     bool m_manualBoneEditMode = false;
+
+    void notifyTransformChanged(const std::string& boneName, 
+                               const Transform& oldTransform, 
+                               const Transform& newTransform);
+    float getCurrentTime() const;
+    
+    friend class Bone; // Allow Bone to notify Character of changes
 };
 
 } // namespace Riggle

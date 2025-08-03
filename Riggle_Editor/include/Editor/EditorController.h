@@ -6,6 +6,7 @@
 #include "Panels/AssetPanel.h"
 #include "Panels/HierarchyPanel.h"
 #include "Panels/PropertyPanel.h"
+#include "Panels/AnimationPanel.h"
 #include <Riggle/Character.h>
 #include <memory>
 #include <vector>
@@ -31,7 +32,8 @@ public:
     AssetBrowserPanel* getAssetBrowserPanel() const { return m_assetBrowserPanel; }
     HierarchyPanel* getHierarchyPanel() const { return m_hierarchyPanel; }
     PropertyPanel* getPropertyPanel() const { return m_propertyPanel; }
-    
+    AnimationPanel* getAnimationPanel() const { return m_animationPanel; }
+
     // Character access
     Character* getCharacter() const { return m_character.get(); }
 
@@ -43,6 +45,7 @@ private:
     AssetBrowserPanel* m_assetBrowserPanel;
     HierarchyPanel* m_hierarchyPanel;
     PropertyPanel* m_propertyPanel;
+    AnimationPanel* m_animationPanel;
     
     // Character
     std::unique_ptr<Character> m_character;

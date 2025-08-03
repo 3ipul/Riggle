@@ -6,6 +6,8 @@
 
 namespace Riggle {
 
+class Character; // Forward declaration
+
 class Rig {
 public:
     Rig(const std::string& name);
@@ -29,9 +31,13 @@ public:
     void updateWorldTransforms();
     void forceUpdateWorldTransforms(); // Force immediate update
 
+    // Character reference management
+    void setCharacter(Character* character);
+
 private:
     std::string m_name;
     std::vector<std::shared_ptr<Bone>> m_rootBones;
+    Character* m_character = nullptr; // Non-owning pointer
     
     void updateBoneHierarchy(std::shared_ptr<Bone> bone); // Recursive helper
 };

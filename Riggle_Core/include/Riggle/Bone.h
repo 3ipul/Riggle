@@ -7,6 +7,7 @@
 
 namespace Riggle {
 
+class Character;
 class Sprite;
 
 class Bone : public std::enable_shared_from_this<Bone> {
@@ -47,10 +48,15 @@ public:
     bool isRoot() const { return m_parent.expired(); }
     std::vector<std::shared_ptr<Bone>> getAllDescendants() const;
 
+    // Set the character this bone belongs to (for event notifications)
+    void setCharacter(Character* character) { m_character = character; }
+
 private:
     std::string m_name;
     float m_length;
     Transform m_localTransform;
+
+    Character* m_character = nullptr; // Non-owning pointer to parent Character
     
     // Hierarchy
     std::weak_ptr<Bone> m_parent;
@@ -64,6 +70,7 @@ private:
     mutable bool m_worldTransformDirty;
     
     void updateWorldTransform() const;
+    void notifyCharacterOfTransformChange(const Transform& oldTransform, const Transform& newTransform);
 };
 
 } // namespace Riggle

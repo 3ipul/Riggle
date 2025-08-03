@@ -1,4 +1,5 @@
 #include "Riggle/Rig.h"
+#include "Riggle/Character.h"
 #include <algorithm>
 #include <functional>
 
@@ -9,6 +10,12 @@ Rig::Rig(const std::string& name) : m_name(name) {
 
 std::shared_ptr<Bone> Rig::createBone(const std::string& name, float length) {
     auto bone = std::make_shared<Bone>(name, length);
+
+    // Set character reference if we have one
+    if (m_character) {
+        bone->setCharacter(m_character);
+    }
+
     m_rootBones.push_back(bone);
     return bone;
 }
@@ -17,8 +24,24 @@ std::shared_ptr<Bone> Rig::createChildBone(std::shared_ptr<Bone> parent, const s
     if (!parent) return nullptr;
     
     auto child = std::make_shared<Bone>(name, length);
+
+    // Set character reference if we have one
+    if (m_character) {
+        child->setCharacter(m_character);
+    }
+
     parent->addChild(child);
     return child;
+}
+
+void Rig::setCharacter(Character* character) {
+    m_character = character;
+    
+    // Update all existing bones with character reference
+    auto allBones = getAllBones();
+    for (auto& bone : allBones) {
+        bone->setCharacter(character);
+    }
 }
 
 void Rig::removeBone(const std::string& name) {
