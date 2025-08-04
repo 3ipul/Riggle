@@ -10,7 +10,7 @@ ViewportPanel::ViewportPanel()
     : BasePanel("Viewport")
     , m_character(nullptr)
     , m_currentTool(ViewportTool::SpriteTool)
-    , m_currentBoneSubTool(BoneSubTool::BoneTransform)
+    // , m_currentBoneSubTool(BoneSubTool::BoneTransform)
     , m_viewportInitialized(false)
     , m_isPanning(false)
     , m_selectedSprite(nullptr)
@@ -23,8 +23,8 @@ ViewportPanel::ViewportPanel()
 {
     m_spriteRenderer = std::make_unique<SpriteRenderer>();
     m_boneRenderer = std::make_unique<BoneRenderer>();
-    m_boneTool = std::make_unique<BoneCreationTool>();
-    m_spriteTool = std::make_unique<SpriteManipulationTool>();
+    m_boneTool = std::make_unique<BoneTool>();
+    m_spriteTool = std::make_unique<SpriteTool>();
     
     setupTools();
 }
@@ -70,11 +70,6 @@ void ViewportPanel::render() {
 
                 if (m_viewportInitialized) {
                     renderViewport();
-
-                    // DRAW OVERLAY DIRECTLY ON THE VIEWPORT
-                    // if (m_currentTool == ViewportTool::BoneTool) {
-                    //     drawBoneToolOverlay();
-                    // }
 
                     // Handle interactions
                     if (ImGui::IsItemHovered() && ImGui::IsWindowHovered()) {
@@ -161,7 +156,7 @@ void ViewportPanel::drawBoneToolOverlay() {
 
     // Use a helper lambda for clean, consistent button drawing
     auto subToolButton = [&](const char* label, BoneSubTool tool) {
-        bool isActive = (m_currentBoneSubTool == tool);
+        bool isActive = (getCurrentBoneSubTool() == tool);
         if (isActive) {
             // Push a color to indicate the active tool
             ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.3f, 0.6f, 0.3f, 1.0f));
@@ -239,12 +234,12 @@ void ViewportPanel::setCharacter(Character* character) {
     }
     if (m_boneTool) {
         m_boneTool->setCharacter(character);
+        if (m_boneTool->getIKTool()) {
+            m_boneTool->getIKTool()->setCharacter(character);
+        }
     }
     if (m_spriteTool) {
         m_spriteTool->setCharacter(character);
-    }
-    if (m_ikTool) {
-        m_ikTool->setCharacter(character);
     }
 }
 
@@ -256,9 +251,6 @@ void ViewportPanel::setTool(ViewportTool tool) {
     }
     if (m_boneTool) {
         m_boneTool->setActive(false);
-    }
-    if (m_ikTool) {
-        m_ikTool->setActive(false);
     }
     
     m_currentTool = tool;
@@ -274,43 +266,10 @@ void ViewportPanel::setTool(ViewportTool tool) {
             if (m_boneTool) {
                 m_boneTool->setActive(true);
             }
-            m_showBoneSubTools = true;
-            // Set default sub-tool if not already set
-            if (m_currentBoneSubTool != BoneSubTool::CreateBone &&
-                m_currentBoneSubTool != BoneSubTool::BoneTransform &&
-                m_currentBoneSubTool != BoneSubTool::IKSolver)
-            {
-                m_currentBoneSubTool = BoneSubTool::BoneTransform;
-            }
             break;
     }
     
     std::cout << "Switched to tool: " << getToolName() << std::endl;
-}
-
-void ViewportPanel::setBoneSubTool(BoneSubTool subTool) {
-    if (m_currentBoneSubTool == subTool) return;
-    
-    m_currentBoneSubTool = subTool;
-
-    // Deactivate all potential bone sub-tools first
-    if (m_boneTool) m_boneTool->setActive(false);
-    if (m_ikTool) m_ikTool->setActive(false);
-    
-    std::cout << "Switched to bone sub-tool: ";
-    switch (subTool) {
-        case BoneSubTool::CreateBone:
-            std::cout << "Create Bone" << std::endl;
-            if (m_boneTool) m_boneTool->setActive(true);
-            break;
-        case BoneSubTool::BoneTransform:
-            std::cout << "Bone Transform" << std::endl;
-            break;
-        case BoneSubTool::IKSolver:
-            std::cout << "IK Solver" << std::endl;
-            if (m_ikTool) m_ikTool->setActive(true);
-            break;
-    }
 }
 
 void ViewportPanel::resetView() {
@@ -467,26 +426,9 @@ void ViewportPanel::renderToolOverlays(sf::RenderTarget& target) {
         m_spriteTool->renderOverlay(target);
     }
     
-    float zoomLevel = getZoomLevel();
-    if (m_currentTool == ViewportTool::BoneTool) {
-        // Render overlays based on the current bone sub-tool
-        switch (m_currentBoneSubTool) {
-            case BoneSubTool::CreateBone:
-                if (m_boneTool) {
-                    m_boneTool->renderOverlay(target, zoomLevel);
-                }
-                break;
-                
-            case BoneSubTool::BoneTransform:
-                // No specific overlay for transform tool (uses general bone highlighting)
-                break;
-                
-            case BoneSubTool::IKSolver:
-                if (m_ikTool) {
-                    m_ikTool->renderOverlay(target, zoomLevel);  // Add this line!
-                }
-                break;
-        }
+    if (m_currentTool == ViewportTool::BoneTool && m_boneTool) {
+        float zoomLevel = getZoomLevel();
+        m_boneTool->renderOverlay(target, zoomLevel); // BoneTool handles all sub-tools
     }
 }
 
@@ -530,35 +472,32 @@ void ViewportPanel::handleViewportInteraction(const sf::Vector2f& worldPos, cons
         if (hoveredSprite != m_selectedSprite) {
             m_selectedSprite = hoveredSprite;
             
-            // Notify about selection change (this triggers approach 2 setup)
+            // Notify about selection change
             if (m_onSpriteSelected) {
                 m_onSpriteSelected(m_selectedSprite);
             }
-            
-            if (hoveredSprite) {
-                std::cout << "Ctrl+hover: Auto-selected sprite '" << hoveredSprite->getName() << "'" << std::endl;
-            }
         }
     }
-    
-    // Handle tool-specific interactions
+
+    // Don't handle tool interactions if we're panning
+    if (m_isPanning) {
+        return;
+    }
+
     switch (m_currentTool) {
         case ViewportTool::SpriteTool:
             handleSpriteManipulation(worldPos);
             break;
             
         case ViewportTool::BoneTool:
-            // Handle based on sub-tool
-            if (m_currentBoneSubTool == BoneSubTool::CreateBone) {
-                handleBoneCreation(worldPos);
-            } else if (m_currentBoneSubTool == BoneSubTool::BoneTransform) {
-                handleBoneTransform(worldPos);
-            } else if (m_currentBoneSubTool == BoneSubTool::IKSolver) {
-                handleIKSolver(worldPos);
+            // Delegate ALL bone handling to BoneTool
+            if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+                m_boneTool->handleMousePressed(worldPos);
+            } else if (ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
+                m_boneTool->handleMouseMoved(worldPos);
+            } else if (ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
+                m_boneTool->handleMouseReleased(worldPos);
             }
-            break;
-            
-        default:
             break;
     }
 }
@@ -602,115 +541,6 @@ void ViewportPanel::handleSpriteManipulation(const sf::Vector2f& worldPos) {
     // Left mouse release - stop dragging
     if (ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
         m_isDragging = false;
-    }
-}
-
-void ViewportPanel::handleBoneCreation(const sf::Vector2f& worldPos) {
-    if (!m_boneTool) return;
-    
-    if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
-        m_boneTool->handleMousePressed(worldPos);
-    }
-    
-    if (ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
-        m_boneTool->handleMouseMoved(worldPos);
-    }
-    
-    if (ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
-        m_boneTool->handleMouseReleased(worldPos);
-    }
-}
-
-void ViewportPanel::handleBoneTransform(const sf::Vector2f& worldPos) {
-    if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
-        auto bone = getBoneAtPosition(worldPos);
-        if (bone != m_selectedBone) {
-            setSelectedBone(bone);
-            if (m_onBoneSelected) {
-                m_onBoneSelected(bone);
-            }
-        }
-    }
-
-    if (m_selectedBone && ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
-        handleBoneRotation(worldPos);
-    }
-}
-
-void ViewportPanel::handleBoneRotation(const sf::Vector2f& worldPos) {
-    if (!m_selectedBone) return;
-    
-    // Get bone's start position (world coordinates)
-    float startX, startY, endX, endY;
-    m_selectedBone->getWorldEndpoints(startX, startY, endX, endY);
-    sf::Vector2f boneStart(startX, startY);
-    
-    // Calculate angle from bone start to mouse position
-    sf::Vector2f mouseOffset = worldPos - boneStart;
-    float targetAngle = std::atan2(mouseOffset.y, mouseOffset.x);
-    
-    // Get current transform
-    Transform currentTransform = m_selectedBone->getLocalTransform();
-    
-    if (m_selectedBone->getParent()) {
-        // Child bone - calculate relative to parent's rotation
-        Transform parentWorld = m_selectedBone->getParent()->getWorldTransform();
-        float localAngle = targetAngle - parentWorld.rotation;
-        
-        // Normalize angle to [-PI, PI]
-        while (localAngle > 3.14159f) localAngle -= 2.0f * 3.14159f;
-        while (localAngle < -3.14159f) localAngle += 2.0f * 3.14159f;
-        
-        currentTransform.rotation = localAngle;
-    } else {
-        // Root bone - use world angle directly
-        currentTransform.rotation = targetAngle;
-    }
-    
-    m_selectedBone->setLocalTransform(currentTransform);
-    
-    // Force update world transforms
-    if (m_character && m_character->getRig()) {
-        m_character->getRig()->forceUpdateWorldTransforms();
-    }
-
-    // Notify controller that a bone changed (if callback is set)
-    if (m_onBoneTransformed) {
-        m_onBoneTransformed(m_selectedBone->getName());
-    }
-    
-    std::cout << "Rotated bone: " << m_selectedBone->getName() 
-              << " to " << (currentTransform.rotation * 180.0f / 3.14159f) << "°" << std::endl;
-}
-
-void ViewportPanel::setSelectedBone(std::shared_ptr<Bone> bone) { 
-    if (m_selectedBone != bone) {
-        m_selectedBone = bone; 
-        
-        // IMPORTANT: Sync with bone creation tool to avoid dual highlights
-        if (m_boneTool) {
-            if (bone) {
-                m_boneTool->setSelectedBone(bone);
-            } else {
-                m_boneTool->clearInternalSelection();
-            }
-        }
-        
-        std::cout << "ViewportPanel: Bone selection changed to: " 
-                  << (bone ? bone->getName() : "none") << std::endl;
-    }
-}
-
-void ViewportPanel::handleIKSolver(const sf::Vector2f& worldPos) {
-    if (!m_ikTool || !m_ikTool->isActive()) return;
-    
-    // Handle based on current mouse state
-    if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
-        m_ikTool->handleMousePressed(worldPos);
-    } else if (ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
-        m_ikTool->handleMouseMoved(worldPos);
-    } else if (ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
-        m_ikTool->handleMouseReleased(worldPos);
     }
 }
 
@@ -790,7 +620,7 @@ std::shared_ptr<Bone> ViewportPanel::getBoneAtPosition(const sf::Vector2f& world
 
 void ViewportPanel::setupTools() {
     // Sprite manipulation tool
-    m_spriteTool = std::make_unique<SpriteManipulationTool>();
+    m_spriteTool = std::make_unique<SpriteTool>();
     if (m_spriteTool) {
         m_spriteTool->setOnSpriteSelected([this](Sprite* sprite) {
             m_selectedSprite = sprite;
@@ -799,11 +629,25 @@ void ViewportPanel::setupTools() {
             }
         });
     }
-    
-    // Bone creation tool
-    m_boneTool = std::make_unique<BoneCreationTool>();
+
+    m_boneTool = std::make_unique<BoneTool>();
     if (m_boneTool) {
+        // Set up IK tool integration
+        auto ikTool = std::make_unique<IKSolverTool>();
+        if (m_character) {
+            ikTool->setCharacter(m_character);
+        }
         
+        // Set up callbacks
+        ikTool->setOnEndEffectorSelected([this](std::shared_ptr<Bone> bone) {
+            if (m_onBoneSelected) {
+                m_onBoneSelected(bone);
+            }
+        });
+        
+        m_boneTool->setIKTool(ikTool.release()); // Transfer ownership
+        
+        // Set up bone tool callbacks
         m_boneTool->setOnBoneCreated([this](std::shared_ptr<Bone> bone) {
             if (m_onBoneCreated) {
                 m_onBoneCreated(bone);
@@ -811,27 +655,17 @@ void ViewportPanel::setupTools() {
         });
         
         m_boneTool->setOnBoneSelected([this](std::shared_ptr<Bone> bone) {
-            m_selectedBone = bone;
             if (m_onBoneSelected) {
                 m_onBoneSelected(bone);
             }
         });
         
+        m_boneTool->setOnBoneRotated([this](std::shared_ptr<Bone> bone, float rotation) {
+            if (m_onBoneRotated) {
+                m_onBoneRotated(bone, rotation);
+            }
+        });
     }
-
-     // Setup IK tool
-    m_ikTool = std::make_unique<IKSolverTool>();
-    if (m_character) {
-        m_ikTool->setCharacter(m_character);
-    }
-    
-    // Setup IK tool callbacks
-    m_ikTool->setOnEndEffectorSelected([this](std::shared_ptr<Bone> bone) {
-        setSelectedBone(bone);
-        if (m_onBoneSelected) {
-            m_onBoneSelected(bone);
-        }
-    });
     
     setTool(ViewportTool::SpriteTool);
 }
@@ -841,13 +675,10 @@ const char* ViewportPanel::getToolName() const {
         case ViewportTool::SpriteTool: 
             return "Sprite Tool";
         case ViewportTool::BoneTool:
-            if (m_currentBoneSubTool == BoneSubTool::CreateBone) {
-                return "Bone Tool - Create Bone";
-            } else if(m_currentBoneSubTool == BoneSubTool::IKSolver) {
-                return "Bone Tool - IK Solver";
-            } else {
-                return "Bone Tool - Transoform";
+            if (m_boneTool) {
+                return ("Bone Tool - " + std::string(m_boneTool->getSubToolName())).c_str();
             }
+            return "Bone Tool";
         default: 
             return "Unknown";
     }

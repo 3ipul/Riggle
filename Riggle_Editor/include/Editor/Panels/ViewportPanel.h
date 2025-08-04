@@ -3,8 +3,8 @@
 #include <Riggle/Character.h>
 #include "../Render/SpriteRenderer.h"
 #include "../Render/BoneRenderer.h"
-#include "../Tools/BoneCreationTool.h"
-#include "../Tools/SpriteManipulationTool.h"
+#include "../Tools/BoneTool.h"
+#include "../Tools/SpriteTool.h"
 #include "../Tools/IKSolverTool.h"
 #include <SFML/Graphics.hpp>
 #include <memory>
@@ -17,11 +17,11 @@ enum class ViewportTool {
     BoneTool
 };
 
-enum class BoneSubTool {
-    CreateBone,
-    BoneTransform,
-    IKSolver
-};
+// enum class BoneSubTool {
+//     CreateBone,
+//     BoneTransform,
+//     IKSolver
+// };
 
 class ViewportPanel : public BasePanel {
 public:
@@ -38,17 +38,17 @@ public:
 
     // Tool management
     ViewportTool getCurrentTool() const { return m_currentTool; }
-    BoneSubTool getCurrentBoneSubTool() const { return m_currentBoneSubTool; }
+    BoneSubTool getCurrentBoneSubTool() const { return m_boneTool ? m_boneTool->getSubTool() : BoneSubTool::BoneTransform; }
     void setTool(ViewportTool tool);
-    void setBoneSubTool(BoneSubTool subTool);
+    void setBoneSubTool(BoneSubTool subTool) { if (m_boneTool) m_boneTool->setSubTool(subTool); }
     const char* getToolName() const;
-    IKSolverTool* getIKTool() const { return m_ikTool.get(); }
+    IKSolverTool* getIKTool() const { return m_boneTool ? m_boneTool->getIKTool() : nullptr; }
 
     // Selection
     Sprite* getSelectedSprite() const { return m_selectedSprite; }
-    std::shared_ptr<Bone> getSelectedBone() const { return m_selectedBone; }
+    std::shared_ptr<Bone> getSelectedBone() const { return m_boneTool ? m_boneTool->getSelectedBone() : nullptr; }
     void setSelectedSprite(Sprite* sprite) { m_selectedSprite = sprite; }
-    void setSelectedBone(std::shared_ptr<Bone> bone);
+    void setSelectedBone(std::shared_ptr<Bone> bone) { if (m_boneTool) m_boneTool->setSelectedBone(bone); }
 
     // View controls
     void resetView();
@@ -77,9 +77,8 @@ private:
     Character* m_character;
     std::unique_ptr<SpriteRenderer> m_spriteRenderer;
     std::unique_ptr<BoneRenderer> m_boneRenderer;
-    std::unique_ptr<BoneCreationTool> m_boneTool;           
-    std::unique_ptr<SpriteManipulationTool> m_spriteTool;
-    std::unique_ptr<IKSolverTool> m_ikTool;
+    std::unique_ptr<BoneTool> m_boneTool;           
+    std::unique_ptr<SpriteTool> m_spriteTool;
 
     // Viewport
     sf::RenderTexture m_renderTexture;
@@ -94,8 +93,8 @@ private:
     bool m_isPanning;
     sf::Vector2f m_panStartPos;
 
-    BoneSubTool m_currentBoneSubTool;
-    bool m_showBoneSubTools;
+    // BoneSubTool m_currentBoneSubTool;
+    // bool m_showBoneSubTools;
 
     // Selection
     Sprite* m_selectedSprite;
@@ -131,10 +130,10 @@ private:
     std::shared_ptr<Bone> getBoneAtPosition(const sf::Vector2f& worldPos);
     Sprite* getSpriteAtPosition(const sf::Vector2f& worldPos);
     void handleSpriteManipulation(const sf::Vector2f& worldPos);
-    void handleBoneCreation(const sf::Vector2f& worldPos);
-    void handleBoneTransform(const sf::Vector2f& worldPos);
-    void handleBoneRotation(const sf::Vector2f& worldPos);
-    void handleIKSolver(const sf::Vector2f& worldPos);
+    // void handleBoneCreation(const sf::Vector2f& worldPos);
+    // void handleBoneTransform(const sf::Vector2f& worldPos);
+    // void handleBoneRotation(const sf::Vector2f& worldPos);
+    // void handleIKSolver(const sf::Vector2f& worldPos);
     
     // Initialization
     void initializeViewport(const sf::Vector2u& size);

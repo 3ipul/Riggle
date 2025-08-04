@@ -48,6 +48,7 @@ void IKSolverTool::handleMousePressed(const sf::Vector2f& worldPos) {
     }
 }
 
+
 void IKSolverTool::handleMouseMoved(const sf::Vector2f& worldPos) {
     if (!m_isActive || !m_character) return;
     

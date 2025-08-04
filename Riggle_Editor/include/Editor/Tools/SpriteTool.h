@@ -7,10 +7,10 @@
 
 namespace Riggle {
 
-class SpriteManipulationTool {
+class SpriteTool {
 public:
-    SpriteManipulationTool();
-    ~SpriteManipulationTool() = default;
+    SpriteTool();
+    ~SpriteTool() = default;
 
     // Core functionality
     void setCharacter(Character* character);

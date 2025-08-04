@@ -220,7 +220,7 @@ void EditorController::setupPanelCallbacks() {
     // Viewport Panel -> Property Panel (sprite/bone selection)
    // Viewport should clear multi-selection when selecting individually
     m_viewportPanel->setOnSpriteSelected([this](Sprite* sprite) {
-        updateSelectionState(sprite, nullptr);
+        updateSelectionState(sprite, m_selectedBone);
     });
     
     m_viewportPanel->setOnBoneSelected([this](std::shared_ptr<Bone> bone) {
@@ -341,13 +341,6 @@ void EditorController::setupPanelCallbacks() {
         }
         m_hasUnsavedChanges = true;
     });
-
-    // m_viewportPanel->setOnBoneTransformed([this](const std::string& boneName) {
-    //         // Check if we should auto-keyframe
-    //         if (m_animationPanel && m_animationPanel->isRecording() && m_animationPanel->isAutoKeyEnabled()) {
-    //             m_animationPanel->createKeyframeForBone(boneName);
-    //         }
-    // });
 
     // Setup transform event handler for auto-keyframing
     if (m_character) {

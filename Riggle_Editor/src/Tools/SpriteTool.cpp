@@ -1,10 +1,10 @@
-#include "Editor/Tools/SpriteManipulationTool.h"
+#include "Editor/Tools/SpriteTool.h"
 #include <iostream>
 #include <cmath>
 
 namespace Riggle {
 
-SpriteManipulationTool::SpriteManipulationTool()
+SpriteTool::SpriteTool()
     : m_character(nullptr)
     , m_isActive(false)
     , m_selectedSprite(nullptr)
@@ -15,12 +15,12 @@ SpriteManipulationTool::SpriteManipulationTool()
 {
 }
 
-void SpriteManipulationTool::setCharacter(Character* character) {
+void SpriteTool::setCharacter(Character* character) {
     m_character = character;
     clearSelection();
 }
 
-void SpriteManipulationTool::handleMousePressed(const sf::Vector2f& worldPos) {
+void SpriteTool::handleMousePressed(const sf::Vector2f& worldPos) {
     if (!m_isActive || !m_character) return;
 
     Sprite* clickedSprite = getSpriteAtPosition(worldPos);
@@ -39,13 +39,13 @@ void SpriteManipulationTool::handleMousePressed(const sf::Vector2f& worldPos) {
     }
 }
 
-void SpriteManipulationTool::handleMouseMoved(const sf::Vector2f& worldPos) {
+void SpriteTool::handleMouseMoved(const sf::Vector2f& worldPos) {
     if (!m_isActive || !m_isDragging) return;
     
     updateDragging(worldPos);
 }
 
-void SpriteManipulationTool::handleMouseReleased() {
+void SpriteTool::handleMouseReleased() {
     if (!m_isActive) return;
     
     if (m_isDragging) {
@@ -53,7 +53,7 @@ void SpriteManipulationTool::handleMouseReleased() {
     }
 }
 
-void SpriteManipulationTool::setSelectedSprite(Sprite* sprite) {
+void SpriteTool::setSelectedSprite(Sprite* sprite) {
     if (m_selectedSprite == sprite) return;
     
     m_selectedSprite = sprite;
@@ -69,11 +69,11 @@ void SpriteManipulationTool::setSelectedSprite(Sprite* sprite) {
     }
 }
 
-void SpriteManipulationTool::clearSelection() {
+void SpriteTool::clearSelection() {
     setSelectedSprite(nullptr);
 }
 
-void SpriteManipulationTool::renderOverlay(sf::RenderTarget& target) {
+void SpriteTool::renderOverlay(sf::RenderTarget& target) {
     if (!m_isActive || !m_character) return;
     
     if (m_selectedSprite) {
@@ -101,7 +101,7 @@ void SpriteManipulationTool::renderOverlay(sf::RenderTarget& target) {
     }
 }
 
-Sprite* SpriteManipulationTool::getSpriteAtPosition(const sf::Vector2f& worldPos) {
+Sprite* SpriteTool::getSpriteAtPosition(const sf::Vector2f& worldPos) {
     if (!m_character) return nullptr;
     
     const auto& sprites = m_character->getSprites();
@@ -114,7 +114,7 @@ Sprite* SpriteManipulationTool::getSpriteAtPosition(const sf::Vector2f& worldPos
     return nullptr;
 }
 
-bool SpriteManipulationTool::isPointInSprite(const sf::Vector2f& point, Sprite* sprite) {
+bool SpriteTool::isPointInSprite(const sf::Vector2f& point, Sprite* sprite) {
     if (!sprite) return false;
     
     Transform worldTransform = sprite->getWorldTransform();
@@ -131,7 +131,7 @@ bool SpriteManipulationTool::isPointInSprite(const sf::Vector2f& point, Sprite* 
             point.y <= spritePos.y + halfHeight);
 }
 
-void SpriteManipulationTool::startDragging(Sprite* sprite, const sf::Vector2f& worldPos) {
+void SpriteTool::startDragging(Sprite* sprite, const sf::Vector2f& worldPos) {
     if (!sprite || sprite->isBoundToBone()) return;
     
     m_draggedSprite = sprite;
@@ -150,7 +150,7 @@ void SpriteManipulationTool::startDragging(Sprite* sprite, const sf::Vector2f& w
     std::cout << "Drag offset: (" << m_dragOffset.x << ", " << m_dragOffset.y << ")" << std::endl;
 }
 
-void SpriteManipulationTool::updateDragging(const sf::Vector2f& worldPos) {
+void SpriteTool::updateDragging(const sf::Vector2f& worldPos) {
     if (!m_isDragging || !m_draggedSprite) return;
     
     sf::Vector2f newPosition = worldPos - m_dragOffset;
@@ -161,7 +161,7 @@ void SpriteManipulationTool::updateDragging(const sf::Vector2f& worldPos) {
     m_draggedSprite->setTransform(transform);
 }
 
-void SpriteManipulationTool::endDragging() {
+void SpriteTool::endDragging() {
     if (m_isDragging && m_draggedSprite) {
         std::cout << "Finished dragging sprite: " << m_draggedSprite->getName() << std::endl;
         
