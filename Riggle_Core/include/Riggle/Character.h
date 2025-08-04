@@ -2,6 +2,7 @@
 
 #include "Sprite.h"
 #include "Rig.h"
+#include "IK_Solver.h"
 #include "Animation.h"
 #include <vector>
 #include <memory>
@@ -54,6 +55,11 @@ public:
     void setRig(std::unique_ptr<Rig> rig);
     Rig* getRig() const { return m_rig.get(); }
 
+    // IK functionality
+    IKSolver& getIKSolver() { return m_ikSolver; }
+    const IKSolver& getIKSolver() const { return m_ikSolver; }
+    bool solveIK(std::shared_ptr<Bone> endEffector, const Vector2& targetPos, int chainLength);
+
      // Animation management
     void addAnimation(std::unique_ptr<Animation> animation);
     void removeAnimation(const std::string& name);
@@ -84,6 +90,7 @@ private:
     std::unique_ptr<Rig> m_rig;
     std::vector<std::unique_ptr<Animation>> m_animations;
     std::vector<TransformEventHandler> m_transformHandlers;
+    IKSolver m_ikSolver;
     AnimationPlayer m_animationPlayer;
     bool m_autoUpdate = true; // Auto-update deformations
     bool m_manualBoneEditMode = false;

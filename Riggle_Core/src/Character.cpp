@@ -106,6 +106,16 @@ void Character::setRig(std::unique_ptr<Rig> rig) {
     }
 }
 
+bool Character::solveIK(std::shared_ptr<Bone> endEffector, const Vector2& targetPos, int chainLength) {
+    if (!m_rig) return false;
+    bool result = m_ikSolver.solveCCD(m_rig.get(), endEffector, targetPos, chainLength);
+    if (result) {
+        // Force update after IK solving
+        forceUpdateDeformations();
+    }
+    return result;
+}
+
 void Character::addAnimation(std::unique_ptr<Animation> animation) {
     if (animation) {
         m_animations.push_back(std::move(animation));

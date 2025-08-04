@@ -1,78 +1,36 @@
 #pragma once
-
-#include "Bone.h"
 #include "Math.h"
-#include <memory>
 #include <vector>
-#include <map>
-#include <functional>
+#include <string>
+#include <memory>
 
 namespace Riggle {
-
-struct IKConstraints {
-    bool enableAngleLimits = false;
-    float minAngle = -3.14159f;  // -180 degrees
-    float maxAngle = 3.14159f;   // +180 degrees
-    bool lockRotation = false;   // Lock this joint from IK rotation
-};
-
-struct IKSolverSettings {
-    int maxIterations = 15;
-    float tolerance = 2.0f;      // Distance tolerance in pixels
-    float dampening = 0.8f;      // Dampening factor (0.0 - 1.0)
-    bool enableConstraints = true;
+    class Rig;
+    class Bone;
     
-    // Callback for iteration updates (for debugging/visualization)
-    std::function<void(int iteration, float distance)> onIteration = nullptr;
-};
+    struct IKChainValidation {
+        bool isValid;
+        std::string message;
+        int maxPossibleLength;
+        std::vector<std::shared_ptr<Bone>> chain;
+    };
 
-class IK_Solver {
-public:
-    IK_Solver() = default;
-    ~IK_Solver() = default;
-
-    // Main CCD IK Solver
-    static bool solveCCD(
-        std::shared_ptr<Bone> endEffector,
-        const Vector2& targetPosition,
-        const IKSolverSettings& settings = IKSolverSettings()
-    );
-    
-    // Solve IK for a specific bone chain
-    static bool solveCCDChain(
-        const std::vector<std::shared_ptr<Bone>>& chain,
-        const Vector2& targetPosition,
-        const IKSolverSettings& settings = IKSolverSettings()
-    );
-    
-    // Set constraints for a bone
-    static void setBoneConstraints(std::shared_ptr<Bone> bone, const IKConstraints& constraints);
-    static IKConstraints getBoneConstraints(std::shared_ptr<Bone> bone);
-    
-    // Utility functions
-    static std::vector<std::shared_ptr<Bone>> buildChainToRoot(std::shared_ptr<Bone> endEffector);
-    static std::vector<std::shared_ptr<Bone>> buildChainBetween(
-        std::shared_ptr<Bone> start, 
-        std::shared_ptr<Bone> end
-    );
-    
-    // Get end effector position
-    static Vector2 getEndEffectorPosition(std::shared_ptr<Bone> endEffector);
-    
-    // Validation
-    static bool validateChain(const std::vector<std::shared_ptr<Bone>>& chain);
-
-private:
-    // Helper functions
-    static float angleBetweenVectors(const Vector2& a, const Vector2& b);
-    static float clampAngle(float angle, float minAngle, float maxAngle);
-    static float normalizeAngle(float angle);
-
-    // Force update all children transforms
-    static void IK_Solver::forceUpdateChildrenTransforms(std::shared_ptr<Bone> bone);
-    
-    // Constraint system
-    static std::map<std::shared_ptr<Bone>, IKConstraints> s_boneConstraints;
-};
-
-} // namespace Riggle
+    class IKSolver {
+    public:
+        // Main solving function
+        bool solveCCD(Rig* rig, std::shared_ptr<Bone> endEffector, const Vector2& targetPos, int chainLength, int maxIterations = 50, float tolerance = 1.0f);
+        
+        // Chain management
+        std::vector<std::shared_ptr<Bone>> buildChain(std::shared_ptr<Bone> endEffector, int chainLength);
+        IKChainValidation validateChain(std::shared_ptr<Bone> endEffector, int chainLength);
+        
+        // Utility functions
+        Vector2 getBoneWorldPosition(std::shared_ptr<Bone> bone);
+        Vector2 getBoneWorldEndPosition(std::shared_ptr<Bone> bone);
+        float getAngleBetweenVectors(const Vector2& from, const Vector2& to);
+        
+    private:
+        int getDistanceToRoot(std::shared_ptr<Bone> bone);
+        void applyRotationToBone(std::shared_ptr<Bone> bone, float deltaAngle);
+    };
+}

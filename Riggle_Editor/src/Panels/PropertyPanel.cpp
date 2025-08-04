@@ -10,6 +10,7 @@ PropertyPanel::PropertyPanel()
     , m_currentType(PropertyType::None)
     , m_selectedSprite(nullptr)
     , m_selectedBone(nullptr)
+    , m_ikTool(nullptr)
     , m_moveStep(10.0f)
     , m_moveStepInt(10)
     , m_showHelp(false)
@@ -27,6 +28,7 @@ void PropertyPanel::render() {
             break;
         case PropertyType::Bone:
             renderBoneProperties();
+            renderIKProperties();
             break;
         case PropertyType::MultiSelection:
             renderMultiSelectionProperties();
@@ -645,6 +647,133 @@ void PropertyPanel::renderBindingControls() {
                 std::cout << "Error during manual binding: " << e.what() << std::endl;
             }
         }
+    }
+}
+
+void PropertyPanel::renderIKProperties() {
+    if (!m_character || !m_ikTool) return;
+    
+    // Only show IK properties when IK tool is active
+    if (!m_ikTool->isActive()) return;
+    
+    ImGui::Separator();
+    ImGui::Text("IK Solver");
+    ImGui::Separator();
+    
+    // Status message
+    std::string status = m_ikTool->getStatusMessage();
+    switch (m_ikTool->getState()) {
+        case IKToolState::WaitingForEndEffector:
+            ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "WARNING: %s", status.c_str());
+            break;
+        case IKToolState::Configured:
+            ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "READY: %s", status.c_str());
+            break;
+        case IKToolState::Solving:
+            ImGui::TextColored(ImVec4(0.0f, 0.8f, 1.0f, 1.0f), "SOLVING: %s", status.c_str());
+            break;
+    }
+    
+    ImGui::Spacing();
+    
+    // End effector info
+    auto endEffector = m_ikTool->getEndEffector();
+    if (endEffector) {
+        ImGui::Text("End Effector: %s", endEffector->getName().c_str());
+        
+        // Get validation info for min/max values
+        auto validation = m_ikTool->validateCurrentChain();
+        int maxAvailable = validation.maxPossibleLength;
+        int minChainLength = 2; // Minimum 2 bones for IK
+        
+        // Chain length input (only editable when not solving)
+        int chainLength = m_ikTool->getChainLength();
+        
+        if (m_ikTool->isSolving()) {
+            // Read-only during solving
+            ImGui::Text("Chain Length: %d bones (locked)", chainLength);
+        } else {
+            // Editable when not solving with validation
+            int newChainLength = chainLength;
+            
+            if (ImGui::InputInt("Chain Length", &newChainLength, 1, 1)) {
+                // Validate the input
+                if (newChainLength < minChainLength) {
+                    // Store error message and timestamp
+                    m_ikErrorMessage = "Chain length must be at least " + std::to_string(minChainLength) + " bones";
+                    m_ikErrorTime = std::chrono::steady_clock::now();
+                    // Don't update the value
+                } else if (newChainLength > maxAvailable) {
+                    // Store error message and timestamp
+                    m_ikErrorMessage = "Only " + std::to_string(maxAvailable) + " bones available";
+                    m_ikErrorTime = std::chrono::steady_clock::now();
+                    // Don't update the value
+                } else {
+                    // Valid input, update the tool
+                    m_ikTool->setChainLength(newChainLength);
+                    m_ikErrorMessage.clear(); // Clear any existing error
+                }
+            }
+            
+            // Show temporary error message if exists and within 1 second
+            if (!m_ikErrorMessage.empty()) {
+                auto now = std::chrono::steady_clock::now();
+                auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - m_ikErrorTime);
+                
+                if (elapsed.count() < 1000) { // Show for 1 second
+                    ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "%s", m_ikErrorMessage.c_str());
+                } else {
+                    m_ikErrorMessage.clear(); // Clear expired message
+                }
+            }
+        }
+        
+        // Validation info
+        if (!validation.isValid) {
+            ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "ERROR: %s", validation.message.c_str());
+        } else {
+            ImGui::Text("Available range: %d - %d bones", minChainLength, validation.maxPossibleLength);
+            
+            // Add helpful info about root inclusion
+            if (chainLength == validation.maxPossibleLength) {
+                ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "Using full chain (includes root)");
+            }
+            
+            // Show chain preview
+            ImGui::Text("Chain Preview:");
+            ImGui::Indent();
+            for (size_t i = 0; i < validation.chain.size(); ++i) {
+                // Chain[0] is root, chain[last] is end effector
+                if (i == validation.chain.size() - 1) {
+                    ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "  %zu. %s (End Effector)", 
+                                     i + 1, validation.chain[i]->getName().c_str());
+                } else if (i == 0 && validation.chain[i]->isRoot()) {
+                    ImGui::TextColored(ImVec4(0.8f, 0.8f, 1.0f, 1.0f), "  %zu. %s (Root)", 
+                                     i + 1, validation.chain[i]->getName().c_str());
+                } else {
+                    ImGui::Text("  %zu. %s", i + 1, validation.chain[i]->getName().c_str());
+                }
+            }
+            ImGui::Unindent();
+        }
+        
+        ImGui::Spacing();
+        
+        // Target position (when solving)
+        if (m_ikTool->isSolving()) {
+            auto target = m_ikTool->getTargetPosition();
+            ImGui::Spacing();
+            ImGui::Text("Target Position: (%.1f, %.1f)", target.x, target.y);
+            
+            // Show solving status
+            ImGui::Text("Status: Solving IK...");
+        }
+        
+    } else {
+        ImGui::Text("End Effector: [Select a bone to begin]");
+        ImGui::Spacing();
+        ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), 
+                          "Click on a bone in the viewport to select it as end effector");
     }
 }
 

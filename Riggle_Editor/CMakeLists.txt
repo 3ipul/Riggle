@@ -38,6 +38,7 @@ add_executable(Riggle_Editor
     src/Panels/AnimationPanel.cpp
     src/Tools/BoneCreationTool.cpp
     src/Tools/SpriteManipulationTool.cpp
+    src/Tools/IKSolverTool.cpp
     # src/ToolMode.cpp
     # Add other source files...
 )

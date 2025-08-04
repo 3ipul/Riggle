@@ -5,6 +5,7 @@
 #include "../Render/BoneRenderer.h"
 #include "../Tools/BoneCreationTool.h"
 #include "../Tools/SpriteManipulationTool.h"
+#include "../Tools/IKSolverTool.h"
 #include <SFML/Graphics.hpp>
 #include <memory>
 #include <functional>
@@ -18,7 +19,8 @@ enum class ViewportTool {
 
 enum class BoneSubTool {
     CreateBone,
-    BoneTransform
+    BoneTransform,
+    IKSolver
 };
 
 class ViewportPanel : public BasePanel {
@@ -40,6 +42,7 @@ public:
     void setTool(ViewportTool tool);
     void setBoneSubTool(BoneSubTool subTool);
     const char* getToolName() const;
+    IKSolverTool* getIKTool() const { return m_ikTool.get(); }
 
     // Selection
     Sprite* getSelectedSprite() const { return m_selectedSprite; }
@@ -76,6 +79,7 @@ private:
     std::unique_ptr<BoneRenderer> m_boneRenderer;
     std::unique_ptr<BoneCreationTool> m_boneTool;           
     std::unique_ptr<SpriteManipulationTool> m_spriteTool;
+    std::unique_ptr<IKSolverTool> m_ikTool;
 
     // Viewport
     sf::RenderTexture m_renderTexture;
@@ -130,6 +134,7 @@ private:
     void handleBoneCreation(const sf::Vector2f& worldPos);
     void handleBoneTransform(const sf::Vector2f& worldPos);
     void handleBoneRotation(const sf::Vector2f& worldPos);
+    void handleIKSolver(const sf::Vector2f& worldPos);
     
     // Initialization
     void initializeViewport(const sf::Vector2u& size);

@@ -1,261 +1,159 @@
 #include "Riggle/IK_Solver.h"
+#include "Riggle/Rig.h"
+#include "Riggle/Bone.h"
 #include <cmath>
 #include <algorithm>
-#include <iostream>
 
 namespace Riggle {
 
-// Static constraint storage
-std::map<std::shared_ptr<Bone>, IKConstraints> IK_Solver::s_boneConstraints;
+bool IKSolver::solveCCD(Rig* rig,std::shared_ptr<Bone> endEffector, const Vector2& targetPos, int chainLength, int maxIterations, float tolerance) {
+    if (!endEffector) return false;
 
-bool IK_Solver::solveCCD(
-    std::shared_ptr<Bone> endEffector,
-    const Vector2& targetPosition,
-    const IKSolverSettings& settings)
-{
-    if (!endEffector) {
-        std::cout << "IK Error: No end effector provided" << std::endl;
-        return false;
-    }
+    auto validation = validateChain(endEffector, chainLength);
+    if (!validation.isValid) return false;
 
-    // Build the bone chain from end effector to root
-    auto chain = buildChainToRoot(endEffector);
-    if (chain.empty()) {
-        std::cout << "IK Error: Empty bone chain" << std::endl;
-        return false;
-    }
-    
-    std::cout << "IK: Solving for chain of " << chain.size() << " bones" << std::endl;
-    return solveCCDChain(chain, targetPosition, settings);
-}
+    std::vector<std::shared_ptr<Bone>> chain = validation.chain;
+    if (chain.size() < 2) return false; // Need at least one bone to rotate and an end-effector.
 
-bool IK_Solver::solveCCDChain(
-    const std::vector<std::shared_ptr<Bone>>& chain,
-    const Vector2& targetPosition,
-    const IKSolverSettings& settings)
-{
-    if (chain.empty()) {
-        std::cout << "IK Error: Empty chain" << std::endl;
-        return false;
-    }
-    
-    if (chain.size() == 1) {
-        std::cout << "IK: Single bone - cannot solve IK" << std::endl;
-        return false;
-    }
-    
-    std::cout << "IK: Starting CCD solve with " << chain.size() << " bones" << std::endl;
-    
-    for (int iteration = 0; iteration < 5; ++iteration) {
-        
-        // Get current end effector position
-        if (!chain[0]) {
-            std::cout << "IK Error: Null end effector" << std::endl;
-            return false;
+    for (int iteration = 0; iteration < maxIterations; ++iteration) {
+        Vector2 endPos = getBoneWorldEndPosition(endEffector);
+        if ((targetPos - endPos).length() < tolerance) {
+            return true; // Success
         }
-        
-        float endX, endY, startX, startY;
-        chain[0]->getWorldEndpoints(startX, startY, endX, endY);
-        Vector2 currentEnd(endX, endY);
-        
-        // Check distance
-        float dx = currentEnd.x - targetPosition.x;
-        float dy = currentEnd.y - targetPosition.y;
-        float distance = std::sqrt(dx * dx + dy * dy);
-        
-        
-        if (distance < 15.0f) {
-            return true;
-        }
-        
-        // FIXED: Rotate ALL bones including end effector (index 0)
-        for (int i = 0; i < chain.size(); ++i) {
-            auto bone = chain[i];
-            if (!bone) {
+
+        // **Correct CCD: Iterate backwards from the end-effector's parent up the chain.**
+        // The chain is ordered [Root-of-chain, ..., Parent, EndEffector].
+        // So we loop from chain.size() - 2 down to 0.
+        for (int i = chain.size() - 1; i >= 0; --i) {
+            std::shared_ptr<Bone> currentBone = chain[i];
+            Vector2 jointPos = getBoneWorldPosition(currentBone);
+            Vector2 currentEndPos = getBoneWorldEndPosition(endEffector);
+
+            Vector2 toEnd = currentEndPos - jointPos;
+            Vector2 toTarget = targetPos - jointPos;
+
+            // Safety check: skip if vectors are too small
+            if (toEnd.lengthSquared() < 0.000001f || toTarget.lengthSquared() < 0.000001f) {
                 continue;
             }
+
+            toEnd = toEnd.normalized();
+            toTarget = toTarget.normalized();
+            float dot = std::max(-1.0f, std::min(1.0f, toEnd.dot(toTarget)));
             
-            // Get joint position (start of this bone)
-            float jointStartX, jointStartY, jointEndX, jointEndY;
-            bone->getWorldEndpoints(jointStartX, jointStartY, jointEndX, jointEndY);
-            Vector2 jointPos(jointStartX, jointStartY);
-            
-            // Update current end position
-            chain[0]->getWorldEndpoints(startX, startY, endX, endY);
-            currentEnd = Vector2(endX, endY);
-            
-            // Calculate rotation needed
-            Vector2 toEnd(currentEnd.x - jointPos.x, currentEnd.y - jointPos.y);
-            Vector2 toTarget(targetPosition.x - jointPos.x, targetPosition.y - jointPos.y);
-            
-            float toEndLen = std::sqrt(toEnd.x * toEnd.x + toEnd.y * toEnd.y);
-            float toTargetLen = std::sqrt(toTarget.x * toTarget.x + toTarget.y * toTarget.y);
-            
-            if (toEndLen < 0.1f || toTargetLen < 0.1f) continue;
-            
-            // Simple angle calculation
-            float currentAngle = std::atan2(toEnd.y, toEnd.x);
-            float targetAngle = std::atan2(toTarget.y, toTarget.x);
-            float rotationDelta = targetAngle - currentAngle;
-            
-            // Normalize angle
-            while (rotationDelta > 3.14159f) rotationDelta -= 2.0f * 3.14159f;
-            while (rotationDelta < -3.14159f) rotationDelta += 2.0f * 3.14159f;
-            
-            // Apply small rotation
-            rotationDelta *= 0.3f;  // Heavy dampening for stability
-            
-            Transform boneTransform = bone->getLocalTransform();
-            boneTransform.rotation += rotationDelta;
-            bone->setLocalTransform(boneTransform);
-            
-            // CRITICAL: Force update all children transforms
-            forceUpdateChildrenTransforms(bone);
-            
+            // Skip if already aligned
+            if (dot > 0.9999f) {
+                continue;
+            }
+
+            float angle = std::acos(dot);
+            if (toEnd.cross(toTarget) < 0) {
+                angle = -angle;
+            }
+
+            if (std::abs(angle) > 0.0001f) {
+                // After rotating a bone, we MUST update the world transforms
+                // of all bones so the next calculation is accurate.
+                applyRotationToBone(currentBone, angle);
+                if (i > 0) rig->forceUpdateWorldTransforms();
+            }
         }
     }
-    
-    std::cout << "IK: Did not converge" << std::endl;
-    return false;
+
+    return (targetPos - getBoneWorldEndPosition(endEffector)).length() < tolerance;
 }
 
-void IK_Solver::setBoneConstraints(std::shared_ptr<Bone> bone, const IKConstraints& constraints) {
-    if (bone) {
-        s_boneConstraints[bone] = constraints;
-    }
-}
-
-IKConstraints IK_Solver::getBoneConstraints(std::shared_ptr<Bone> bone) {
-    auto it = s_boneConstraints.find(bone);
-    if (it != s_boneConstraints.end()) {
-        return it->second;
-    }
-    return IKConstraints(); // Default constraints
-}
-
-std::vector<std::shared_ptr<Bone>> IK_Solver::buildChainToRoot(std::shared_ptr<Bone> endEffector) {
+std::vector<std::shared_ptr<Bone>> IKSolver::buildChain(std::shared_ptr<Bone> endEffector, int chainLength) {
     std::vector<std::shared_ptr<Bone>> chain;
-    
-    if (!endEffector) {
-        std::cout << "IK Error: Null end effector" << std::endl;
-        return chain;
-    }
-    
-    // Start with the end effector
-    auto current = endEffector;
-    
-    // Build a SHORT chain (max 3 bones for testing)
-    int maxChainLength = 3;
-    
-    for (int i = 0; i < maxChainLength && current; ++i) {
+    if (!endEffector || chainLength <= 0) return chain;
+
+    std::shared_ptr<Bone> current = endEffector;
+    for (int i = 0; i < chainLength && current != nullptr; ++i) {
         chain.push_back(current);
-        std::cout << "IK: Added bone '" << current->getName() << "' to chain (index " << i << ")" << std::endl;
-        
         current = current->getParent();
-        
-        // If we reached a bone with no parent, stop
-        if (!current) {
-            std::cout << "IK: Reached root bone, stopping chain build" << std::endl;
-            break;
-        }
     }
-    
-    std::cout << "IK: Built chain of " << chain.size() << " bones" << std::endl;
+
+    // The chain is currently [End, Parent, Grandparent, ...].
+    // Reverse it to be [Root-of-chain, ..., Parent, End].
+    std::reverse(chain.begin(), chain.end());
     return chain;
 }
 
-std::vector<std::shared_ptr<Bone>> IK_Solver::buildChainBetween(
-    std::shared_ptr<Bone> start, 
-    std::shared_ptr<Bone> end) 
-{
-    std::vector<std::shared_ptr<Bone>> chain;
-    
-    if (!start || !end) {
-        return chain;
+IKChainValidation IKSolver::validateChain(std::shared_ptr<Bone> endEffector, int chainLength) {
+    if (!endEffector) {
+        return {false, "No end effector selected", 0, {}};
     }
-    
-    auto current = start;
-    while (current && current != end) {
-        chain.push_back(current);
+
+    if (chainLength <= 0) {
+        return {false, "Chain length must be at least 1", 0, {}};
+    }
+
+    // Calculate the actual maximum possible chain length from this bone
+    int maxPossibleLength = 1; // Start with the end-effector itself
+    std::shared_ptr<Bone> current = endEffector;
+    while(current->getParent() != nullptr) {
+        maxPossibleLength++;
         current = current->getParent();
-        
-        // Safety check
-        if (chain.size() > 100) {
-            std::cout << "IK Warning: Chain search too long, breaking" << std::endl;
-            chain.clear();
-            return chain;
-        }
     }
-    
-    if (current == end) {
-        chain.push_back(end);
-    } else {
-        chain.clear();
+
+    if (chainLength > maxPossibleLength) {
+        return {false, "Only " + std::to_string(maxPossibleLength) + " bones available in chain", maxPossibleLength, {}};
     }
-    
-    return chain;
+
+    auto chain = buildChain(endEffector, chainLength);
+    return {true, "Valid chain", maxPossibleLength, chain};
 }
 
-Vector2 IK_Solver::getEndEffectorPosition(std::shared_ptr<Bone> endEffector) {
-    if (!endEffector) {
-        std::cout << "IK Error: Null bone in getEndEffectorPosition" << std::endl;
-        return Vector2(0.0f, 0.0f);
-    }
+Vector2 IKSolver::getBoneWorldPosition(std::shared_ptr<Bone> bone) {
+    if (!bone) return Vector2(0, 0);
     
+    // Get the world transform start position (joint position)
+    Transform worldTransform = bone->getWorldTransform();
+    return worldTransform.position;
+}
+
+Vector2 IKSolver::getBoneWorldEndPosition(std::shared_ptr<Bone> bone) {
+    if (!bone) return Vector2(0, 0);
+    
+    // Get world endpoints using existing Bone method
     float startX, startY, endX, endY;
-    endEffector->getWorldEndpoints(startX, startY, endX, endY);
+    bone->getWorldEndpoints(startX, startY, endX, endY);
     return Vector2(endX, endY);
 }
 
-bool IK_Solver::validateChain(const std::vector<std::shared_ptr<Bone>>& chain) {
-    if (chain.empty()) {
-        return false;
-    }
+float IKSolver::getAngleBetweenVectors(const Vector2& from, const Vector2& to) {
+    Vector2 fromNorm = from.normalized();
+    Vector2 toNorm = to.normalized();
     
-    // Check that all bones are valid
-    for (const auto& bone : chain) {
-        if (!bone) {
-            std::cout << "IK Error: Null bone in chain" << std::endl;
-            return false;
-        }
-    }
+    float dot = fromNorm.dot(toNorm);
+    float cross = fromNorm.cross(toNorm);
     
-    // Check connectivity (optional for now)
-    return true;
-}
-
-float IK_Solver::angleBetweenVectors(const Vector2& a, const Vector2& b) {
-    float dot = a.x * b.x + a.y * b.y;
-    float cross = a.x * b.y - a.y * b.x;
     return std::atan2(cross, dot);
 }
 
-float IK_Solver::clampAngle(float angle, float minAngle, float maxAngle) {
-    return std::max(minAngle, std::min(maxAngle, angle));
+int IKSolver::getDistanceToRoot(std::shared_ptr<Bone> bone) {
+    int distance = 0;
+    std::shared_ptr<Bone> current = bone;
+    
+    while (current && current->getParent()) {
+        current = current->getParent();
+        distance++;
+    }
+    
+    return distance;
 }
 
-float IK_Solver::normalizeAngle(float angle) {
-    const float PI = 3.14159f;
-    while (angle > PI) angle -= 2.0f * PI;
-    while (angle < -PI) angle += 2.0f * PI;
-    return angle;
-}
-
-void IK_Solver::forceUpdateChildrenTransforms(std::shared_ptr<Bone> bone) {
+void IKSolver::applyRotationToBone(std::shared_ptr<Bone> bone, float deltaAngle) {
     if (!bone) return;
     
-    // Force update this bone's world transform
-    bone->getWorldTransform();
+    // Get current local transform
+    Transform localTransform = bone->getLocalTransform();
     
-    // Recursively update all children
-    const auto& children = bone->getChildren();
-    for (const auto& child : children) {
-        if (child) {
-            // Mark child as dirty and update
-            child->markWorldTransformDirty();
-            forceUpdateChildrenTransforms(child);
-        }
-    }
+    // Add delta angle to current rotation
+    localTransform.rotation += deltaAngle;
+    
+    // Set the updated transform
+    bone->setLocalTransform(localTransform);
 }
 
-} // namespace Riggle
+}

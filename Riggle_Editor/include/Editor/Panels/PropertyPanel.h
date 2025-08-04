@@ -4,7 +4,9 @@
 #include <Riggle/Character.h>
 #include <Riggle/Sprite.h>
 #include <Riggle/Bone.h>
+#include "../Tools/IKSolverTool.h"
 #include <functional>
+#include <chrono>
 
 namespace Riggle {
 
@@ -33,6 +35,7 @@ public:
     bool hasMultipleTypesSelected() const { return m_selectedSprite && m_selectedBone; }
 
     Sprite* getSelectedSprite() const { return m_selectedSprite; }
+    void setIKTool(IKSolverTool* ikTool) { m_ikTool = ikTool; }
 
     // Character management
     void setCharacter(Character* character) { m_character = character; }
@@ -46,7 +49,12 @@ private:
     // Selected objects
     Sprite* m_selectedSprite;
     std::shared_ptr<Bone> m_selectedBone;
+    IKSolverTool* m_ikTool;
     
+    // IK error message handling
+    std::string m_ikErrorMessage;
+    std::chrono::steady_clock::time_point m_ikErrorTime;
+
     // Movement controls
     float m_moveStep;
     int m_moveStepInt;
@@ -60,6 +68,7 @@ private:
     void renderMovementButtons();
     void renderSpriteBindings();
     void moveSprite(float deltaX, float deltaY);
+    void renderIKProperties();
 
     void renderMultiSelectionProperties();
     void renderBindingControls();

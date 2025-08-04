@@ -361,6 +361,10 @@ void EditorController::setupPanelCallbacks() {
         });
     }
 
+    if (m_propertyPanel && m_viewportPanel) {
+        m_propertyPanel->setIKTool(m_viewportPanel->getIKTool());
+    }
+
     std::cout << "Panel callbacks setup complete" << std::endl;
 
 }

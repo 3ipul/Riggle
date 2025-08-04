@@ -72,9 +72,9 @@ void ViewportPanel::render() {
                     renderViewport();
 
                     // DRAW OVERLAY DIRECTLY ON THE VIEWPORT
-                    if (m_currentTool == ViewportTool::BoneTool) {
-                        drawBoneToolOverlay();
-                    }
+                    // if (m_currentTool == ViewportTool::BoneTool) {
+                    //     drawBoneToolOverlay();
+                    // }
 
                     // Handle interactions
                     if (ImGui::IsItemHovered() && ImGui::IsWindowHovered()) {
@@ -96,7 +96,13 @@ void ViewportPanel::render() {
                     }
                 }
             }
+            // Draw the overlay on top of the viewport image
+            if (m_currentTool == ViewportTool::BoneTool) {
+                drawBoneToolOverlay();
+            }
+
             ImGui::EndChild();
+            ImGui::PopStyleVar();
         }
         
         // Status bar (fixed height)
@@ -113,6 +119,7 @@ void ViewportPanel::render() {
             }
         }
     }
+
     ImGui::End();
 }
 
@@ -147,87 +154,34 @@ void ViewportPanel::renderToolButtons() {
 }
 
 void ViewportPanel::drawBoneToolOverlay() {
-    ImDrawList* drawList = ImGui::GetWindowDrawList();
-    ImVec2 windowPos = ImGui::GetWindowPos();
-    
-    // Position in top-left corner of viewport
-    ImVec2 overlayPos = ImVec2(windowPos.x + 5, windowPos.y + 5);
-    ImVec2 buttonSize = ImVec2(80, 20);
-    float spacing = 5.0f;
-    
-    // Draw background rectangle
-    ImVec2 bgSize = ImVec2(buttonSize.x * 2 + spacing + 10, buttonSize.y + 10);
-    drawList->AddRectFilled(
-        overlayPos, 
-        ImVec2(overlayPos.x + bgSize.x, overlayPos.y + bgSize.y),
-        IM_COL32(35, 35, 35, 220), // Dark background
-        5.0f // Rounded corners
-    );
-    
-    // Draw border
-    drawList->AddRect(
-        overlayPos, 
-        ImVec2(overlayPos.x + bgSize.x, overlayPos.y + bgSize.y),
-        IM_COL32(80, 80, 80, 255),
-        5.0f, 0, 1.0f
-    );
-    
-    
-    // Get mouse position
-    ImVec2 mousePos = ImGui::GetMousePos();
-    bool mouseClicked = ImGui::IsMouseClicked(ImGuiMouseButton_Left);
-    
-    // Create button area
-    ImVec2 createBtnPos = ImVec2(overlayPos.x + 5, overlayPos.y + 5);
-    ImVec2 createBtnMax = ImVec2(createBtnPos.x + buttonSize.x, createBtnPos.y + buttonSize.y);
-    
-    bool createActive = (m_currentBoneSubTool == BoneSubTool::CreateBone);
-    bool createHovered = (mousePos.x >= createBtnPos.x && mousePos.x <= createBtnMax.x &&
-                         mousePos.y >= createBtnPos.y && mousePos.y <= createBtnMax.y);
-    
-    // Draw create button
-    ImU32 createColor;
-    if (createActive) {
-        createColor = IM_COL32(50, 120, 180, 255);
-    } else if (createHovered) {
-        createColor = IM_COL32(90, 90, 90, 255);
-    } else {
-        createColor = IM_COL32(70, 70, 70, 255);
-    }
-    
-    drawList->AddRectFilled(createBtnPos, createBtnMax, createColor, 3.0f);
-    drawList->AddText(ImVec2(createBtnPos.x + 18, createBtnPos.y + 3), IM_COL32(255, 255, 255, 255), "Create");
-    
-    // Check create button click
-    if (createHovered && mouseClicked) {
-        setBoneSubTool(BoneSubTool::CreateBone);
-    }
-    
-    // Transform button area
-    ImVec2 transformBtnPos = ImVec2(overlayPos.x + 5 + buttonSize.x + spacing, overlayPos.y + 5);
-    ImVec2 transformBtnMax = ImVec2(transformBtnPos.x + buttonSize.x, transformBtnPos.y + buttonSize.y);
-    
-    bool transformActive = (m_currentBoneSubTool == BoneSubTool::BoneTransform);
-    bool transformHovered = (mousePos.x >= transformBtnPos.x && mousePos.x <= transformBtnMax.x &&
-                            mousePos.y >= transformBtnPos.y && mousePos.y <= transformBtnMax.y);
-    
-    // Draw transform button
-    ImU32 transformColor;
-    if (transformActive) {
-        transformColor = IM_COL32(50, 120, 180, 255);
-    } else if (transformHovered) {
-        transformColor = IM_COL32(90, 90, 90, 255);
-    } else {
-        transformColor = IM_COL32(70, 70, 70, 255);
-    }
-    
-    drawList->AddRectFilled(transformBtnPos, transformBtnMax, transformColor, 3.0f);
-    drawList->AddText(ImVec2(transformBtnPos.x + 8, transformBtnPos.y + 3), IM_COL32(255, 255, 255, 255), "Transform");
-    
-    // Check transform button click
-    if (transformHovered && mouseClicked) {
-        setBoneSubTool(BoneSubTool::BoneTransform);
-    }
+    // We will draw directly into the current window (the Viewport),
+    // but we'll set the cursor position to create an overlay effect.
+    const float padding = 10.0f;
+    ImGui::SetCursorPos(ImVec2(padding, padding));
+
+    // Use a helper lambda for clean, consistent button drawing
+    auto subToolButton = [&](const char* label, BoneSubTool tool) {
+        bool isActive = (m_currentBoneSubTool == tool);
+        if (isActive) {
+            // Push a color to indicate the active tool
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.3f, 0.6f, 0.3f, 1.0f));
+        }
+
+        if (ImGui::Button(label, ImVec2(100, 0))) {
+            setBoneSubTool(tool);
+        }
+
+        if (isActive) {
+            ImGui::PopStyleColor();
+        }
+    };
+
+    // Group the buttons together so they don't affect layout below them
+    ImGui::BeginGroup();
+    subToolButton("Create", BoneSubTool::CreateBone);
+    subToolButton("Transform", BoneSubTool::BoneTransform);
+    subToolButton("IK Solver", BoneSubTool::IKSolver);
+    ImGui::EndGroup();
 }
 
 void ViewportPanel::update(sf::RenderWindow& window) {
@@ -289,6 +243,9 @@ void ViewportPanel::setCharacter(Character* character) {
     if (m_spriteTool) {
         m_spriteTool->setCharacter(character);
     }
+    if (m_ikTool) {
+        m_ikTool->setCharacter(character);
+    }
 }
 
 void ViewportPanel::setTool(ViewportTool tool) {
@@ -299,6 +256,9 @@ void ViewportPanel::setTool(ViewportTool tool) {
     }
     if (m_boneTool) {
         m_boneTool->setActive(false);
+    }
+    if (m_ikTool) {
+        m_ikTool->setActive(false);
     }
     
     m_currentTool = tool;
@@ -316,7 +276,10 @@ void ViewportPanel::setTool(ViewportTool tool) {
             }
             m_showBoneSubTools = true;
             // Set default sub-tool if not already set
-            if (m_currentBoneSubTool != BoneSubTool::CreateBone && m_currentBoneSubTool != BoneSubTool::BoneTransform) {
+            if (m_currentBoneSubTool != BoneSubTool::CreateBone &&
+                m_currentBoneSubTool != BoneSubTool::BoneTransform &&
+                m_currentBoneSubTool != BoneSubTool::IKSolver)
+            {
                 m_currentBoneSubTool = BoneSubTool::BoneTransform;
             }
             break;
@@ -329,8 +292,25 @@ void ViewportPanel::setBoneSubTool(BoneSubTool subTool) {
     if (m_currentBoneSubTool == subTool) return;
     
     m_currentBoneSubTool = subTool;
+
+    // Deactivate all potential bone sub-tools first
+    if (m_boneTool) m_boneTool->setActive(false);
+    if (m_ikTool) m_ikTool->setActive(false);
     
-    std::cout << "Switched to bone sub-tool: " << (subTool == BoneSubTool::CreateBone ? "Create Bone" : "Transform") << std::endl;
+    std::cout << "Switched to bone sub-tool: ";
+    switch (subTool) {
+        case BoneSubTool::CreateBone:
+            std::cout << "Create Bone" << std::endl;
+            if (m_boneTool) m_boneTool->setActive(true);
+            break;
+        case BoneSubTool::BoneTransform:
+            std::cout << "Bone Transform" << std::endl;
+            break;
+        case BoneSubTool::IKSolver:
+            std::cout << "IK Solver" << std::endl;
+            if (m_ikTool) m_ikTool->setActive(true);
+            break;
+    }
 }
 
 void ViewportPanel::resetView() {
@@ -487,9 +467,26 @@ void ViewportPanel::renderToolOverlays(sf::RenderTarget& target) {
         m_spriteTool->renderOverlay(target);
     }
     
-    if (m_currentTool == ViewportTool::BoneTool && m_boneTool) {
-        float zoomLevel = getZoomLevel();
-        m_boneTool->renderOverlay(target, zoomLevel);
+    float zoomLevel = getZoomLevel();
+    if (m_currentTool == ViewportTool::BoneTool) {
+        // Render overlays based on the current bone sub-tool
+        switch (m_currentBoneSubTool) {
+            case BoneSubTool::CreateBone:
+                if (m_boneTool) {
+                    m_boneTool->renderOverlay(target, zoomLevel);
+                }
+                break;
+                
+            case BoneSubTool::BoneTransform:
+                // No specific overlay for transform tool (uses general bone highlighting)
+                break;
+                
+            case BoneSubTool::IKSolver:
+                if (m_ikTool) {
+                    m_ikTool->renderOverlay(target, zoomLevel);  // Add this line!
+                }
+                break;
+        }
     }
 }
 
@@ -556,6 +553,8 @@ void ViewportPanel::handleViewportInteraction(const sf::Vector2f& worldPos, cons
                 handleBoneCreation(worldPos);
             } else if (m_currentBoneSubTool == BoneSubTool::BoneTransform) {
                 handleBoneTransform(worldPos);
+            } else if (m_currentBoneSubTool == BoneSubTool::IKSolver) {
+                handleIKSolver(worldPos);
             }
             break;
             
@@ -702,6 +701,19 @@ void ViewportPanel::setSelectedBone(std::shared_ptr<Bone> bone) {
     }
 }
 
+void ViewportPanel::handleIKSolver(const sf::Vector2f& worldPos) {
+    if (!m_ikTool || !m_ikTool->isActive()) return;
+    
+    // Handle based on current mouse state
+    if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+        m_ikTool->handleMousePressed(worldPos);
+    } else if (ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
+        m_ikTool->handleMouseMoved(worldPos);
+    } else if (ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
+        m_ikTool->handleMouseReleased(worldPos);
+    }
+}
+
 sf::Vector2f ViewportPanel::screenToWorld(const sf::Vector2f& screenPos) const {
     if (!m_viewportInitialized) return sf::Vector2f(0, 0);
     
@@ -804,7 +816,22 @@ void ViewportPanel::setupTools() {
                 m_onBoneSelected(bone);
             }
         });
+        
     }
+
+     // Setup IK tool
+    m_ikTool = std::make_unique<IKSolverTool>();
+    if (m_character) {
+        m_ikTool->setCharacter(m_character);
+    }
+    
+    // Setup IK tool callbacks
+    m_ikTool->setOnEndEffectorSelected([this](std::shared_ptr<Bone> bone) {
+        setSelectedBone(bone);
+        if (m_onBoneSelected) {
+            m_onBoneSelected(bone);
+        }
+    });
     
     setTool(ViewportTool::SpriteTool);
 }
@@ -816,8 +843,10 @@ const char* ViewportPanel::getToolName() const {
         case ViewportTool::BoneTool:
             if (m_currentBoneSubTool == BoneSubTool::CreateBone) {
                 return "Bone Tool - Create Bone";
+            } else if(m_currentBoneSubTool == BoneSubTool::IKSolver) {
+                return "Bone Tool - IK Solver";
             } else {
-                return "Bone Tool - Transform";
+                return "Bone Tool - Transoform";
             }
         default: 
             return "Unknown";
