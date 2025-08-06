@@ -1,17 +1,11 @@
 #pragma once
 #include "BasePanel.h"
-#include "Editor/AssetManager.h"
+#include "../Utils/AssetManager.h"
 #include <SFML/Graphics.hpp>
 #include <functional>
 #include <memory>
 #include <string>
 #include <unordered_set>
-
-#ifdef _WIN32
-#include <windows.h>
-#include <shlobj.h>
-#include <commdlg.h>
-#endif
 
 namespace Riggle {
 
@@ -53,7 +47,6 @@ private:
     void refreshAssets();
     void scanDirectory(const std::string& directory);
     void openDirectoryDialog();
-    std::string selectDirectory();
     
     // Selection management
     void selectAll();

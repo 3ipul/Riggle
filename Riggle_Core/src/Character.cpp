@@ -141,6 +141,15 @@ Animation* Character::findAnimation(const std::string& name) {
     return nullptr;
 }
 
+Animation* Character::findAnimation(const std::string& name) const {
+    auto it = std::find_if(m_animations.begin(), m_animations.end(),
+        [&name](const std::unique_ptr<Animation>& anim) {
+            return anim && anim->getName() == name;
+        });
+    
+    return (it != m_animations.end()) ? it->get() : nullptr;
+}
+
 void Character::update(float deltaTime) {
     // Don't update animations during manual bone editing
     if (m_manualBoneEditMode) {

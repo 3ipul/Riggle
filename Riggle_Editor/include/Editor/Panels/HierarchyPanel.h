@@ -50,6 +50,8 @@ private:
     bool m_isRenaming;
     std::shared_ptr<Bone> m_renamingBone;
     std::string m_renameBuffer;
+    std::string m_contextMenuPopupId;
+    bool m_shouldOpenContextMenu = false;
     
     // Callbacks
     std::function<void(std::shared_ptr<Bone>)> m_onBoneSelected;
@@ -63,7 +65,7 @@ private:
     // Helper methods
     void renderBoneHierarchy();
     void renderBoneNode(std::shared_ptr<Bone> bone, int depth = 0);
-    void renderContextMenu();
+    void renderContextMenu(const std::string& popupId);
     void renderRenameModal();
     void deleteBone(std::shared_ptr<Bone> bone);
     void renameBone(std::shared_ptr<Bone> bone, const std::string& newName);

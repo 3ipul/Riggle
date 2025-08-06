@@ -1,4 +1,5 @@
 #include "Editor/Panels/AssetBrowserPanel.h"
+#include "Editor/Utils/FileDialogManager.h"
 #include <imgui.h>
 #include <iostream>
 
@@ -176,40 +177,15 @@ void AssetBrowserPanel::scanDirectory(const std::string& directory) {
 }
 
 void AssetBrowserPanel::openDirectoryDialog() {
-    std::string selectedPath = selectDirectory();
-    if (!selectedPath.empty()) {
+    std::string selectedPath;
+    if (FileDialogManager::getInstance().directoryDialog(selectedPath, "Select Assets Directory", m_currentDirectory)) {
         m_currentDirectory = selectedPath;
         refreshAssets();
+        std::cout << "Asset directory changed to: " << selectedPath << std::endl;
     }
 }
 
-std::string AssetBrowserPanel::selectDirectory() {
-#ifdef _WIN32
-    // Windows-specific directory picker using ANSI functions
-    BROWSEINFOA bi = { 0 };
-    bi.lpszTitle = "Select Assets Directory";
-    bi.ulFlags = BIF_RETURNONLYFSDIRS | BIF_NEWDIALOGSTYLE;
-    
-    LPITEMIDLIST pidl = SHBrowseForFolderA(&bi);
-    if (pidl != nullptr) {
-        char path[MAX_PATH];
-        if (SHGetPathFromIDListA(pidl, path)) {
-            std::string result(path);
-            CoTaskMemFree(pidl);
-            return result;
-        }
-        CoTaskMemFree(pidl);
-    }
-    return "";
-#else
-    // For cross-platform support, you could use nativefiledialog library
-    // For now, fallback to the old text input method
-    std::cout << "Directory selection not implemented for this platform" << std::endl;
-    return "";
-#endif
-}
-
-// NEW: Selection management functions
+// Selection management functions
 void AssetBrowserPanel::selectAll() {
     m_selectedAssets.clear();
     for (const auto& asset : m_assetManager->getImageAssets()) {

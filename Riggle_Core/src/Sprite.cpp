@@ -107,4 +107,15 @@ void Sprite::updateFromBone() {
     // This method can be used for additional update logic if needed
 }
 
+void Sprite::restoreBinding(std::shared_ptr<Bone> bone, const Vector2& localOffset, float localRotation) {
+    if (!bone) return;
+    if (m_binding.bone) unbindFromBone();
+
+    m_binding.bone = bone;
+    m_binding.weight = 1.0f;
+    m_binding.bindOffset = localOffset;
+    m_binding.bindRotation = localRotation;
+    bone->addBoundSprite(shared_from_this());
+}
+
 } // namespace Riggle

@@ -21,13 +21,13 @@ target_include_directories(ImGui-SFML PUBLIC
 )
 
 target_compile_definitions(ImGui-SFML PRIVATE SFML_STATIC)
+set_source_files_properties(src/Utils/miniz.c PROPERTIES LANGUAGE C)
 
 # Main application
 add_executable(Riggle_Editor
     src/main.cpp
     src/EditorApplication.cpp
     src/EditorController.cpp
-    src/AssetManager.cpp
     src/Render/BoneRenderer.cpp
     src/Render/SpriteRenderer.cpp
     src/Panels/AssetPanel.cpp
@@ -39,6 +39,13 @@ add_executable(Riggle_Editor
     src/Tools/BoneTool.cpp
     src/Tools/SpriteTool.cpp
     src/Tools/IKSolverTool.cpp
+    src/Export/ExportManager.cpp
+    src/Export/JSONExporter.cpp
+    src/Export/PNGExporter.cpp
+    src/Utils/AssetManager.cpp
+    src/Utils/FileDialogManager.cpp
+    src/Utils/miniz.c
+    src/Project/ProjectManager.cpp
     # src/ToolMode.cpp
     # Add other source files...
 )

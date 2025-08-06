@@ -7,6 +7,9 @@
 #include "Panels/HierarchyPanel.h"
 #include "Panels/PropertyPanel.h"
 #include "Panels/AnimationPanel.h"
+#include "Export/ExportManager.h"
+#include "Editor/Utils/FileDialogManager.h"
+#include "Editor/Project/ProjectManager.h"
 #include <Riggle/Character.h>
 #include <memory>
 #include <vector>
@@ -47,6 +50,11 @@ private:
     PropertyPanel* m_propertyPanel;
     AnimationPanel* m_animationPanel;
     
+    // ------------------------------------------
+    std::unique_ptr<ProjectManager> m_projectManager;
+    std::string m_currentProjectPath;
+    ProjectMetadata m_currentProjectMetadata;
+    
     // Character
     std::unique_ptr<Character> m_character;
     
@@ -55,6 +63,9 @@ private:
     bool m_showExitConfirmation = false;
     bool m_shouldExit = false;          
     bool m_hasUnsavedChanges = false;
+    bool m_showControlsDialog = false;
+    bool m_showAboutDialog = false;
+    bool m_showProjectSettingsDialog = false;
     
     // Initialization
     void initializePanels();
@@ -83,12 +94,34 @@ private:
     void renderMainMenuBar();
     void renderAssetHierarchyTabs();
     void renderExitConfirmation();
+    void renderControlsDialog();
+    void renderAboutDialog();
+    void renderProjectSettingsDialog();
     
     // Project management
+    void initializeProjectSystem();
     void newProject();             
     void saveProject();             
-    void loadProject();            
-    bool hasUnsavedChanges() const; 
+    void loadProject(); 
+    void updateAllPanelsWithCharacter();           
+    bool hasUnsavedChanges() const;
+    
+    // Export dialog state
+    std::unique_ptr<ExportManager> m_exportManager;
+    bool m_showExportDialog;
+    int m_selectedProjectExporter;
+    int m_selectedAnimationExporter;
+    bool m_exportProject; // true for project, false for animation
+    char m_outputPath[512];
+    char m_projectName[256];
+    char m_animationName[256];
+    std::string m_lastExportError;
+    
+    // Export methods
+    void initializeExportSystem();
+    void renderExportDialog();
+    void performExport();
+    bool openFileDialog(std::string& selectedPath, bool isDirectory = false);
 };
 
 } // namespace Riggle

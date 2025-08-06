@@ -64,6 +64,7 @@ public:
     void addAnimation(std::unique_ptr<Animation> animation);
     void removeAnimation(const std::string& name);
     Animation* findAnimation(const std::string& name);
+    Animation* findAnimation(const std::string& name) const;
     const std::vector<std::unique_ptr<Animation>>& getAnimations() const { return m_animations; }
     
     // Animation playback

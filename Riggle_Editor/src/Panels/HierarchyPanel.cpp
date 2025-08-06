@@ -29,8 +29,12 @@ void HierarchyPanel::render() {
         }
         
         // Handle context menu
-        if (m_showContextMenu) {
-            renderContextMenu();
+        if (m_showContextMenu && !m_contextMenuPopupId.empty()) {
+            if (m_shouldOpenContextMenu) {
+                ImGui::OpenPopup(m_contextMenuPopupId.c_str());
+                m_shouldOpenContextMenu = false;
+            }
+            renderContextMenu(m_contextMenuPopupId);
         }
     }
     ImGui::End();
@@ -55,8 +59,12 @@ void HierarchyPanel::renderContent() {
     }
     
     // Handle context menu
-    if (m_showContextMenu) {
-        renderContextMenu();
+    if (m_showContextMenu && !m_contextMenuPopupId.empty()) {
+        if (m_shouldOpenContextMenu) {
+                ImGui::OpenPopup(m_contextMenuPopupId.c_str());
+                m_shouldOpenContextMenu = false;
+        }
+        renderContextMenu(m_contextMenuPopupId);
     }
     // Handle rename modal
     if (m_isRenaming) {
@@ -99,10 +107,7 @@ void HierarchyPanel::renderBoneNode(std::shared_ptr<Bone> bone, int depth) {
     
     // Create unique ID for this bone
     std::string nodeId = bone->getName() + "##" + std::to_string(reinterpret_cast<uintptr_t>(bone.get()));
-    
-    // Indentation for hierarchy
-    float indentSize = 12.0f * depth;
-    ImGui::Indent(indentSize);
+    std::string popupId = "BoneContextMenu##" + std::to_string(reinterpret_cast<uintptr_t>(bone.get()));
     
     // Node flags
     ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick;
@@ -144,7 +149,8 @@ void HierarchyPanel::renderBoneNode(std::shared_ptr<Bone> bone, int depth) {
     if (ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
         m_contextMenuBone = bone;
         m_showContextMenu = true;
-        ImGui::OpenPopup("BoneContextMenu");
+        m_contextMenuPopupId = popupId;
+        m_shouldOpenContextMenu = true;
     }
     
     // Render children if node is open
@@ -155,11 +161,10 @@ void HierarchyPanel::renderBoneNode(std::shared_ptr<Bone> bone, int depth) {
         ImGui::TreePop();
     }
     
-    ImGui::Unindent(indentSize);
 }
 
-void HierarchyPanel::renderContextMenu() {
-    if (ImGui::BeginPopup("BoneContextMenu")) {
+void HierarchyPanel::renderContextMenu(const std::string& popupId) {
+    if (ImGui::BeginPopup(popupId.c_str())) {
         if (m_contextMenuBone) {
             ImGui::Text("Bone: %s", m_contextMenuBone->getName().c_str());
             ImGui::Separator();
@@ -183,6 +188,10 @@ void HierarchyPanel::renderContextMenu() {
                 deleteBone(m_contextMenuBone);
             }
             
+            if(!m_contextMenuBone->getChildren().empty()){
+                ImGui::TextDisabled("Cannot delete bone with children");
+            }
+            
             if (m_contextMenuBone->isRoot()) {
                 ImGui::TextDisabled("Root bones cannot be deleted");
             }
@@ -192,6 +201,7 @@ void HierarchyPanel::renderContextMenu() {
     } else {
         m_showContextMenu = false;
         m_contextMenuBone = nullptr;
+        m_contextMenuPopupId.clear();
     }
 }
 
@@ -294,8 +304,8 @@ void HierarchyPanel::deleteBone(std::shared_ptr<Bone> bone) {
     if (!bone || !m_character || !m_character->getRig()) return;
     
     // Root bone can only be deleted if it has no children
-    if (bone->isRoot() && !bone->getChildren().empty()) {
-        std::cout << "Cannot delete root bone with children: " << bone->getName() << std::endl;
+    if (!bone->getChildren().empty()) {
+        std::cout << "Cannot delete bone with children: " << bone->getName() << std::endl;
         return;
     }
     
@@ -316,6 +326,7 @@ void HierarchyPanel::deleteBone(std::shared_ptr<Bone> bone) {
     
     m_contextMenuBone = nullptr;
     m_showContextMenu = false;
+    m_contextMenuPopupId.clear();
 }
 
 std::string HierarchyPanel::getBoneDisplayName(std::shared_ptr<Bone> bone) const {

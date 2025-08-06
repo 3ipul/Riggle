@@ -45,6 +45,7 @@ public:
     // Binding operations
     void bindToBone(std::shared_ptr<Bone> bone, const Vector2& offset = {0, 0}, float rotation = 0.0f);
     void unbindFromBone();
+    void restoreBinding(std::shared_ptr<Bone> bone, const Vector2& localOffset, float localRotation);
     void clearBinding() { unbindFromBone(); }
     
     // Update transform based on bone (called during animation)

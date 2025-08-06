@@ -24,6 +24,7 @@ public:
     std::shared_ptr<Bone> findBone(const std::string& name);
     
     // Bone hierarchy
+    void addRootBone(std::shared_ptr<Bone> bone) { m_rootBones.push_back(bone); }
     const std::vector<std::shared_ptr<Bone>>& getRootBones() const { return m_rootBones; }
     std::vector<std::shared_ptr<Bone>> getAllBones() const;
     

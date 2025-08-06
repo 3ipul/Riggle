@@ -19,11 +19,14 @@ private:
     bool m_showStartup;
     bool m_showAboutDialog;
     
-    // SFML objects (not pointers, just like your working main)
+    // SFML objects
     sf::RenderWindow m_window;
     sf::Clock m_deltaClock;
+
+    sf::Texture m_logoTexture;
+    bool m_logoLoaded = false;
     
-    // Editor controller (unique_ptr since it's created later)
+    // Editor controller
     std::unique_ptr<EditorController> m_editorController;
     
     // Methods

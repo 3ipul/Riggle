@@ -11,6 +11,7 @@ EditorApplication::EditorApplication()
     , m_showAboutDialog(false)
     , m_window(sf::VideoMode({500, 400}), "Riggle - 2D Skeletal Animation Tool", sf::Style::Titlebar | sf::Style::Close)
     , m_editorController(nullptr)
+    , m_logoLoaded(false)
 {
     m_window.setFramerateLimit(60);
     
@@ -20,6 +21,8 @@ EditorApplication::EditorApplication()
     int x = (desktop.size.x - windowSize.x) / 2;
     int y = (desktop.size.y - windowSize.y) / 2;
     m_window.setPosition(sf::Vector2i(x, y));
+
+    m_logoLoaded = m_logoTexture.loadFromFile("Riggle_Editor/Assets/Riggle_logo.png");
 }
 
 EditorApplication::~EditorApplication() {
@@ -91,7 +94,7 @@ int EditorApplication::run() {
 }
 
 void EditorApplication::renderStartupWindow() {
-    ImVec2 windowSize(400, 300);
+    ImVec2 windowSize(420, 340);
     ImVec2 windowPos((m_window.getSize().x - windowSize.x) * 0.5f, 
                      (m_window.getSize().y - windowSize.y) * 0.5f);
     
@@ -104,58 +107,76 @@ void EditorApplication::renderStartupWindow() {
                             ImGuiWindowFlags_NoTitleBar;
     
     if (ImGui::Begin("Startup", nullptr, flags)) {
-        // Title
-        const char* title = "Welcome to Riggle";
+        if (m_logoLoaded) {
+        float logoWidth = 64.0f;
+        float logoHeight = 64.0f;
+        float centerX = (windowSize.x - logoWidth) * 0.5f;
+        ImGui::SetCursorPosX(centerX);
+        ImTextureID logoTexId = reinterpret_cast<ImTextureID>(m_logoTexture.getNativeHandle());
+        ImGui::Image(logoTexId, ImVec2(logoWidth, logoHeight));
+        ImGui::Spacing();
+    }
+
+        ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[0]);
+        const char* title = "Riggle";
         float titleWidth = ImGui::CalcTextSize(title).x;
         ImGui::SetCursorPosX((windowSize.x - titleWidth) * 0.5f);
-        ImGui::Text("%s", title);
-        
-        ImGui::Spacing();
-        ImGui::Separator();
-        ImGui::Spacing();
-        
+        ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.6667f, 1.0f), "%s", title);
+        ImGui::PopFont();
+
         // Subtitle
         const char* subtitle = "2D Skeletal Animation Tool";
         float subtitleWidth = ImGui::CalcTextSize(subtitle).x;
         ImGui::SetCursorPosX((windowSize.x - subtitleWidth) * 0.5f);
         ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "%s", subtitle);
-        
+
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+
         ImGui::Spacing();
         ImGui::Spacing();
-        
-        // Buttons
+        ImGui::Spacing();
+
+        // Start Editor Button
         float buttonWidth = 250.0f;
-        float buttonHeight = 40.0f;
+        float buttonHeight = 44.0f;
         float buttonX = (windowSize.x - buttonWidth) * 0.5f;
-        
         ImGui::SetCursorPosX(buttonX);
-        if (ImGui::Button("Create New Project", ImVec2(buttonWidth, buttonHeight))) {
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.1216f, 0.3373f, 0.2353f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.1294f, 0.7020f, 0.4745f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.0f, 1.0f, 0.6667f, 1.0f));
+        if (ImGui::Button("Start Editor", ImVec2(buttonWidth, buttonHeight))) {
             startEditor();
         }
-        
+
         ImGui::Spacing();
-        
-        ImGui::SetCursorPosX(buttonX);
-        if (ImGui::Button("Open Existing Project", ImVec2(buttonWidth, buttonHeight))) {
-            std::cout << "Project opening not implemented yet - coming soon!" << std::endl;
-        }
-        
         ImGui::Spacing();
-        
+        ImGui::Spacing();
+
+        // About Button
         ImGui::SetCursorPosX(buttonX);
-        if (ImGui::Button("About Riggle", ImVec2(buttonWidth, buttonHeight))) {
+        if (ImGui::Button("About Riggle", ImVec2(buttonWidth, 36.0f))) {
             m_showAboutDialog = true;
         }
-        
+
         ImGui::Spacing();
         ImGui::Spacing();
-        
+        ImGui::Spacing();
+
+        // Exit Button
         float exitButtonWidth = 100.0f;
         float exitButtonX = (windowSize.x - exitButtonWidth) * 0.5f;
         ImGui::SetCursorPosX(exitButtonX);
         if (ImGui::Button("Exit", ImVec2(exitButtonWidth, 30.0f))) {
             m_window.close();
         }
+
+        // Version and credits at the bottom
+        ImGui::SetCursorPosY(windowSize.y - 40);
+        ImGui::Separator();
+        ImGui::SetCursorPosX((windowSize.x - 200) * 0.5f);
+        ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "Version 1.0.0 | © 2025 Riggle Team");
     }
     ImGui::End();
     
@@ -163,6 +184,12 @@ void EditorApplication::renderStartupWindow() {
     if (m_showAboutDialog) {
         ImGui::OpenPopup("About Riggle");
     }
+    ImGui::PopStyleColor(3);
+    ImVec4 customColor = ImVec4(0.1216f, 0.3373f, 0.2353f, 1.0f);
+
+    ImGui::PushStyleColor(ImGuiCol_TitleBg, customColor);
+    ImGui::PushStyleColor(ImGuiCol_TitleBgActive, customColor);
+    ImGui::PushStyleColor(ImGuiCol_TitleBgCollapsed, customColor);
     
     if (ImGui::BeginPopupModal("About Riggle", &m_showAboutDialog, ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::Text("Riggle - 2D Skeletal Animation Tool");
@@ -170,10 +197,10 @@ void EditorApplication::renderStartupWindow() {
         ImGui::Text("Version: 1.0.0");
         ImGui::Text("A lightweight, open-source 2D skeletal animation tool");
         ImGui::Spacing();
-        ImGui::Text("Features:");
-        ImGui::BulletText("Forward Kinematics (FK)");
-        ImGui::BulletText("Inverse Kinematics (IK)");
-        ImGui::BulletText("Physics simulation");
+        ImGui::Text("Developed by:");
+        ImGui::BulletText("Bipul Gautam");
+        ImGui::BulletText("Bishal Khatiwada");
+        ImGui::BulletText("Bishal Rimal");
         ImGui::Spacing();
         
         if (ImGui::Button("Close")) {
@@ -183,6 +210,7 @@ void EditorApplication::renderStartupWindow() {
         
         ImGui::EndPopup();
     }
+    ImGui::PopStyleColor(3);
 }
 
 void EditorApplication::startEditor() {

@@ -67,8 +67,10 @@ void Rig::removeBone(const std::string& name) {
             parent->removeChild(bone);
             
             // Move all children to the parent
-            for (auto& child : bone->getChildren())
+            auto children = bone->getChildren();
+            for (auto& child : children) {
                 parent->addChild(child);
+            }
         }
     }
     
