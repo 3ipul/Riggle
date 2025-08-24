@@ -25,6 +25,10 @@ private:
 
     sf::Texture m_logoTexture;
     bool m_logoLoaded = false;
+
+    sf::Vector2u m_savedWindowSize;
+    sf::Vector2i m_savedWindowPosition;
+    bool m_windowStateLoaded = false;
     
     // Editor controller
     std::unique_ptr<EditorController> m_editorController;
@@ -32,6 +36,9 @@ private:
     // Methods
     void renderStartupWindow();
     void startEditor();
+
+    void loadWindowState();
+    void saveWindowState();
 };
 
 } // namespace Riggle

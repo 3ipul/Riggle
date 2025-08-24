@@ -3,6 +3,7 @@
 #include <imgui.h>
 #include <imgui-SFML.h>
 #include <iostream>
+#include <fstream>
 
 namespace Riggle {
 
@@ -15,6 +16,8 @@ EditorApplication::EditorApplication()
 {
     m_window.setFramerateLimit(60);
     
+    loadWindowState();
+
     // Center the startup window
     sf::VideoMode desktop = sf::VideoMode::getDesktopMode();
     sf::Vector2u windowSize = m_window.getSize();
@@ -70,6 +73,8 @@ int EditorApplication::run() {
     style.Colors[ImGuiCol_ResizeGripHovered] = ImVec4(0.129f, 0.702f, 0.475f, 1.0f);
     style.Colors[ImGuiCol_ResizeGripActive] = ImVec4(0.0f, 1.0f, 0.6667f, 1.0f);
 
+    sf::Vector2i prevPosition = m_window.getPosition();
+
     // Main loop
     while (m_window.isOpen()) {
         // Event handling 
@@ -79,6 +84,7 @@ int EditorApplication::run() {
             if (event->is<sf::Event::Closed>()) {
                 if (m_editorController) {
                     m_editorController->requestExit();
+                    saveWindowState();
                 } else {
                     m_window.close();
                 }
@@ -90,6 +96,32 @@ int EditorApplication::run() {
             }
         }
 
+        if (!m_showStartup) {
+            sf::Vector2u size = m_window.getSize();
+            sf::Vector2i currPosition = m_window.getPosition();
+            unsigned int minWidth = 640, minHeight = 480;
+
+            bool positionChangedX = (currPosition.x != prevPosition.x);
+            bool positionChangedY = (currPosition.y != prevPosition.y);
+
+            if (size.x < minWidth || size.y < minHeight) {
+                sf::Vector2i newPosition = currPosition;
+
+                if (size.x < minWidth && positionChangedX) {
+                    int dx = (int)minWidth - (int)size.x;
+                    newPosition.x -= dx;
+                }
+                if (size.y < minHeight && positionChangedY) {
+                    int dy = (int)minHeight - (int)size.y;
+                    newPosition.y -= dy;
+                }
+
+                m_window.setSize({std::max(size.x, minWidth), std::max(size.y, minHeight)});
+                m_window.setPosition(newPosition);
+            }
+            prevPosition = m_window.getPosition();
+        }
+
         ImGui::SFML::Update(m_window, m_deltaClock.restart());
         
         // Update editor if it exists
@@ -98,6 +130,7 @@ int EditorApplication::run() {
             
             // Check if editor wants to exit
             if (m_editorController->shouldExit()) {
+                saveWindowState();
                 m_window.close();
                 break;
             }
@@ -236,15 +269,68 @@ void EditorApplication::renderStartupWindow() {
 }
 
 void EditorApplication::startEditor() {
-    // Resize window to fullscreen
-    m_window.create(sf::VideoMode::getDesktopMode(), "Riggle - 2D Skeletal Animation Tool");
+    m_window.create(sf::VideoMode(m_savedWindowSize), "Riggle - 2D Skeletal Animation Tool", sf::Style::Resize | sf::Style::Titlebar | sf::Style::Close);
+    m_window.setPosition(m_savedWindowPosition);
     m_window.setFramerateLimit(60);
-    
-    // Create editor controller
+
     m_editorController = std::make_unique<EditorController>();
-    
-    // Hide startup window
     m_showStartup = false;
+}
+
+// void EditorApplication::loadWindowState() {
+//     std::ifstream in("window_state.ini");
+//     if (in) {
+//         unsigned int w, h;
+//         int x, y;
+//         in >> w >> h >> x >> y;
+//         m_savedWindowSize = sf::Vector2u(w, h);
+//         m_savedWindowPosition = sf::Vector2i(x, y);
+//     } else {
+//         m_savedWindowSize = sf::Vector2u(1280, 720);
+//         sf::VideoMode desktop = sf::VideoMode::getDesktopMode();
+//         int x = (desktop.size.x - m_savedWindowSize.x) / 2;
+//         int y = (desktop.size.y - m_savedWindowSize.y) / 2;
+//         m_savedWindowPosition = sf::Vector2i(x, y);
+//     }
+// }
+
+void EditorApplication::loadWindowState() {
+    std::ifstream in("window_state.ini");
+    sf::VideoMode desktop = sf::VideoMode::getDesktopMode();
+    unsigned int w = 1280, h = 720;
+    int x = -1, y = -1;
+    bool valid = false;
+
+    if (in) {
+        in >> w >> h >> x >> y;
+        // Validate size and position
+        if (!in.fail() &&
+            w >= 640 && h >= 480 &&
+            w <= desktop.size.x && h <= desktop.size.y &&
+            x >= -1000 && y >= -1000 &&
+            x + (int)w <= (int)desktop.size.x &&
+            y + (int)h <= (int)desktop.size.y) {
+            valid = true;
+        }
+    }
+
+    if (!valid) {
+        w = 1280; h = 720;
+        x = (desktop.size.x - w) / 2;
+        y = (desktop.size.y - h) / 2;
+    }
+
+    m_savedWindowSize = sf::Vector2u(w, h);
+    m_savedWindowPosition = sf::Vector2i(x, y);
+}
+
+void EditorApplication::saveWindowState() {
+    std::ofstream out("window_state.ini");
+    if (out) {
+        sf::Vector2u size = m_window.getSize();
+        sf::Vector2i position = m_window.getPosition();
+        out << size.x << " " << size.y << " " << position.x << " " << position.y << std::endl;
+    }
 }
 
 } // namespace Riggle
