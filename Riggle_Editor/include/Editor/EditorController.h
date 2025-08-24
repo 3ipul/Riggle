@@ -50,7 +50,7 @@ private:
     PropertyPanel* m_propertyPanel;
     AnimationPanel* m_animationPanel;
     
-    // ------------------------------------------
+    // Project management
     std::unique_ptr<ProjectManager> m_projectManager;
     std::string m_currentProjectPath;
     ProjectMetadata m_currentProjectMetadata;

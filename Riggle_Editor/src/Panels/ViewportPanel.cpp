@@ -10,7 +10,6 @@ ViewportPanel::ViewportPanel()
     : BasePanel("Viewport")
     , m_character(nullptr)
     , m_currentTool(ViewportTool::SpriteTool)
-    // , m_currentBoneSubTool(BoneSubTool::BoneTransform)
     , m_viewportInitialized(false)
     , m_isPanning(false)
     , m_selectedSprite(nullptr)
@@ -135,16 +134,17 @@ void ViewportPanel::renderToolButtons() {
         
         bool isSelected = (m_currentTool == tools[i]);
         if (isSelected) {
-            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.3f, 0.6f, 0.3f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.137f, 0.514f, 0.353f, 1.0f));
+        } else {
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.106f, 0.255f, 0.180f, 1.0f));
         }
         
         if (ImGui::Button(toolNames[i])) {
             setTool(tools[i]);
         }
         
-        if (isSelected) {
-            ImGui::PopStyleColor();
-        }
+        ImGui::PopStyleColor();
+        
     }
 }
 
@@ -158,17 +158,16 @@ void ViewportPanel::drawBoneToolOverlay() {
     auto subToolButton = [&](const char* label, BoneSubTool tool) {
         bool isActive = (getCurrentBoneSubTool() == tool);
         if (isActive) {
-            // Push a color to indicate the active tool
-            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.3f, 0.6f, 0.3f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.137f, 0.514f, 0.353f, 1.0f));
+        } else {
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.106f, 0.255f, 0.180f, 1.0f));
         }
 
         if (ImGui::Button(label, ImVec2(100, 0))) {
             setBoneSubTool(tool);
         }
 
-        if (isActive) {
-            ImGui::PopStyleColor();
-        }
+        ImGui::PopStyleColor();
     };
 
     // Group the buttons together so they don't affect layout below them

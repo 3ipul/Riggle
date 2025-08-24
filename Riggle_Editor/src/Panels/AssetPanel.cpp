@@ -85,7 +85,7 @@ void AssetPanel::renderEmptyState() {
     } else {
         // When Asset Browser is visible, show a different message
         ImGui::Spacing();
-        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.7f, 0.9f, 0.7f, 1.0f)); // Light green text
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.2f, 1.0f, 0.2f, 1.0f)); // Green text
         ImGui::TextWrapped("Asset Browser is open. Browse and select image files to add them as sprites.");
         ImGui::PopStyleColor();
     }
@@ -115,7 +115,7 @@ void AssetPanel::renderSpriteList() {
     } else {
         // When Asset Browser is visible, show status text
         ImGui::SetCursorPosX(ImGui::GetContentRegionAvail().x - 120);
-        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.7f, 0.9f, 0.7f, 1.0f)); // Light green text
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.2f, 1.0f, 0.2f, 1.0f)); // Green text
         ImGui::Text("Asset Browser Open");
         ImGui::PopStyleColor();
     }
@@ -173,7 +173,7 @@ void AssetPanel::renderSpriteItem(Sprite* sprite, size_t index) {
     if (isSelected) {
         ImGui::GetWindowDrawList()->AddRectFilled(
             nameAreaMin, nameAreaMax, 
-            IM_COL32(0, 100, 200, 100) // Blue selection background only on name area
+            IM_COL32(31, 86, 60, 255) // selection background only on name area
         );
     }
     
@@ -223,7 +223,7 @@ void AssetPanel::renderSpriteItem(Sprite* sprite, size_t index) {
     // Set button color based on visibility state
     if (isVisible) {
         // Green color for visible sprites
-        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.20f, 0.70f, 0.20f, 0.60f));
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.20f, 0.80f, 0.20f, 0.75f));
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.30f, 0.80f, 0.30f, 1.00f));
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.15f, 0.60f, 0.15f, 1.00f));
     } else {
@@ -265,7 +265,7 @@ void AssetPanel::renderSpriteItem(Sprite* sprite, size_t index) {
     ImGui::SetCursorPos(ImVec2(startPos.x + deleteButtonX, startPos.y + 3.5f));
     
     // Set red color for delete button
-    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.80f, 0.20f, 0.20f, 0.60f));
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.80f, 0.20f, 0.20f, 0.75f));
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.90f, 0.30f, 0.30f, 1.00f));
     ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.70f, 0.15f, 0.15f, 1.00f));
     
@@ -301,9 +301,9 @@ void AssetPanel::renderSpriteItem(Sprite* sprite, size_t index) {
         ImGui::Separator();
         // Add selection instruction to tooltip
         if (isSelected) {
-            ImGui::TextColored(ImVec4(0.7f, 0.9f, 1.0f, 1.0f), "Click to unselect");
+            ImGui::TextColored(ImVec4(0.2f, 1.0f, 0.667f, 1.0f), "Click to unselect");
         } else {
-            ImGui::TextColored(ImVec4(0.7f, 0.9f, 1.0f, 1.0f), "Click to select");
+            ImGui::TextColored(ImVec4(0.2f, 1.0f, 0.667f, 1.0f), "Click to select");
         }
         ImGui::EndTooltip();
     }

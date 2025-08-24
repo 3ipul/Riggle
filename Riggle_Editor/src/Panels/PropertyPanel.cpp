@@ -670,7 +670,7 @@ void PropertyPanel::renderIKProperties() {
             ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "READY: %s", status.c_str());
             break;
         case IKToolState::Solving:
-            ImGui::TextColored(ImVec4(0.0f, 0.8f, 1.0f, 1.0f), "SOLVING: %s", status.c_str());
+            ImGui::TextColored(ImVec4(0.2f, 1.0f, 0.667f, 1.0f), "SOLVING: %s", status.c_str());
             break;
     }
     
@@ -736,7 +736,7 @@ void PropertyPanel::renderIKProperties() {
             
             // Add helpful info about root inclusion
             if (chainLength == validation.maxPossibleLength) {
-                ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "Using full chain (includes root)");
+                ImGui::TextColored(ImVec4(0.2f, 1.0f, 0.2f, 1.0f), "Using full chain");
             }
             
             // Show chain preview
