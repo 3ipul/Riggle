@@ -16,6 +16,5 @@ set(SFML_INCLUDE_DIR "${SFML_ROOT}/include")
 set(SFML_LIB_DIR "${SFML_ROOT}/lib")
 
 # Add subdirectories
-# add_subdirectory(common)
 add_subdirectory(Riggle_Core)
 add_subdirectory(Riggle_Editor)

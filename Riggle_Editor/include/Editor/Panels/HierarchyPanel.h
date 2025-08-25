@@ -15,7 +15,6 @@ public:
 
     void render() override;
     void update(sf::RenderWindow& window) override;
-    void renderContent() override;
 
     // Character management
     void setCharacter(Character* character) { m_character = character; }

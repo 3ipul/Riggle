@@ -41,6 +41,8 @@ int EditorApplication::run() {
         return -1;
     }
 
+    ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+
     ImGuiStyle& style = ImGui::GetStyle();
     style.Colors[ImGuiCol_TitleBgActive] = ImVec4(0.122f, 0.337f, 0.235f, 1.0f);
 
@@ -62,6 +64,9 @@ int EditorApplication::run() {
     style.Colors[ImGuiCol_Tab] = ImVec4(0.106f, 0.255f, 0.180f, 1.0f);
     style.Colors[ImGuiCol_TabHovered] = ImVec4(0.137f, 0.604f, 0.412f, 1.0f);
     style.Colors[ImGuiCol_TabActive] = ImVec4(0.137f, 0.514f, 0.353f, 1.0f);
+    style.Colors[ImGuiCol_TabUnfocused] = ImVec4(0.106f, 0.255f, 0.180f, 1.0f);
+    style.Colors[ImGuiCol_TabUnfocusedActive] = ImVec4(0.129f, 0.424f, 0.294f, 1.0f);
+    style.Colors[ImGuiCol_TabSelectedOverline] = ImVec4(0.137f, 0.514f, 0.353f, 1.0f);
 
     style.Colors[ImGuiCol_CheckMark] = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
 
@@ -72,6 +77,9 @@ int EditorApplication::run() {
     style.Colors[ImGuiCol_ResizeGrip] = ImVec4(0.122f, 0.337f, 0.235f, 1.0f);
     style.Colors[ImGuiCol_ResizeGripHovered] = ImVec4(0.129f, 0.702f, 0.475f, 1.0f);
     style.Colors[ImGuiCol_ResizeGripActive] = ImVec4(0.0f, 1.0f, 0.6667f, 1.0f);
+
+    style.Colors[ImGuiCol_DockingPreview] = ImVec4(0.0f, 1.0f, 0.667f, 0.3f);
+    style.Colors[ImGuiCol_DockingEmptyBg] = ImVec4(0.086f, 0.176f, 0.129f, 1.0f);
 
     sf::Vector2i prevPosition = m_window.getPosition();
 
@@ -143,6 +151,7 @@ int EditorApplication::run() {
         if (m_showStartup) {
             renderStartupWindow();
         } else if (m_editorController) {
+            renderDockSpace();
             // Render editor content
             m_editorController->render(m_window);
         }
@@ -156,6 +165,37 @@ int EditorApplication::run() {
     std::cout << "Riggle Editor shutting down ..." << std::endl;
     ImGui::SFML::Shutdown();
     return 0;
+}
+
+void EditorApplication::renderDockSpace() {
+    ImGuiViewport* viewport = ImGui::GetMainViewport();
+    ImGui::SetNextWindowPos(viewport->Pos);
+    ImGui::SetNextWindowSize(viewport->Size);
+    ImGui::SetNextWindowViewport(viewport->ID);
+
+    ImGuiWindowFlags dockspace_flags = ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoDocking |
+                                       ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse |
+                                       ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
+                                       ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus;
+
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+
+    ImGui::Begin("DockSpace", nullptr, dockspace_flags);
+
+    ImGui::PopStyleVar(2);
+
+    ImGuiID dockspace_id = ImGui::GetID("MyDockSpace");
+
+    // Check if layout reset is requested
+    if (m_editorController && m_editorController->isLayoutResetRequested()) {
+        m_editorController->setupInitialDockLayout(dockspace_id);
+        m_editorController->clearLayoutResetRequest();
+    }
+
+    ImGui::DockSpace(dockspace_id, ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_None);
+
+    ImGui::End();
 }
 
 void EditorApplication::renderStartupWindow() {
@@ -177,7 +217,7 @@ void EditorApplication::renderStartupWindow() {
         float logoHeight = 64.0f;
         float centerX = (windowSize.x - logoWidth) * 0.5f;
         ImGui::SetCursorPosX(centerX);
-        ImTextureID logoTexId = reinterpret_cast<ImTextureID>(m_logoTexture.getNativeHandle());
+        ImTextureID logoTexId = (ImTextureID)(intptr_t)(m_logoTexture.getNativeHandle());
         ImGui::Image(logoTexId, ImVec2(logoWidth, logoHeight));
         ImGui::Spacing();
     }
@@ -269,30 +309,23 @@ void EditorApplication::renderStartupWindow() {
 }
 
 void EditorApplication::startEditor() {
+    // Check if the ImGui settings file exists BEFORE creating the main editor.
+    std::ifstream imguiIniFile("imgui.ini");
+    bool applyDefaultLayout = !imguiIniFile.good();
+
+    // Create the main editor window
     m_window.create(sf::VideoMode(m_savedWindowSize), "Riggle - 2D Skeletal Animation Tool", sf::Style::Resize | sf::Style::Titlebar | sf::Style::Close);
     m_window.setPosition(m_savedWindowPosition);
     m_window.setFramerateLimit(60);
 
     m_editorController = std::make_unique<EditorController>();
+
+    if (applyDefaultLayout) {
+        m_editorController->requestLayoutReset();
+    }
+
     m_showStartup = false;
 }
-
-// void EditorApplication::loadWindowState() {
-//     std::ifstream in("window_state.ini");
-//     if (in) {
-//         unsigned int w, h;
-//         int x, y;
-//         in >> w >> h >> x >> y;
-//         m_savedWindowSize = sf::Vector2u(w, h);
-//         m_savedWindowPosition = sf::Vector2i(x, y);
-//     } else {
-//         m_savedWindowSize = sf::Vector2u(1280, 720);
-//         sf::VideoMode desktop = sf::VideoMode::getDesktopMode();
-//         int x = (desktop.size.x - m_savedWindowSize.x) / 2;
-//         int y = (desktop.size.y - m_savedWindowSize.y) / 2;
-//         m_savedWindowPosition = sf::Vector2i(x, y);
-//     }
-// }
 
 void EditorApplication::loadWindowState() {
     std::ifstream in("window_state.ini");

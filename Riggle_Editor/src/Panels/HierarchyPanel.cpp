@@ -36,6 +36,11 @@ void HierarchyPanel::render() {
             }
             renderContextMenu(m_contextMenuPopupId);
         }
+        // Handle rename modal
+        if (m_isRenaming) {
+            renderRenameModal();
+        }
+        
     }
     ImGui::End();
 }
@@ -45,30 +50,6 @@ void HierarchyPanel::setSelectedBone(std::shared_ptr<Bone> bone) {
         m_selectedBone = bone;
         std::cout << "HierarchyPanel: Bone selection changed to: " 
                   << (bone ? bone->getName() : "none") << std::endl;
-    }
-}
-
-void HierarchyPanel::renderContent() {
-    // Render just the content without the ImGui::Begin/End wrapper
-    if (m_character && m_character->getRig()) {
-        renderBoneHierarchy();
-    } else {
-        ImGui::Text("No character loaded");
-        ImGui::Spacing();
-        ImGui::TextWrapped("Load a character or create bones to see the hierarchy.");
-    }
-    
-    // Handle context menu
-    if (m_showContextMenu && !m_contextMenuPopupId.empty()) {
-        if (m_shouldOpenContextMenu) {
-                ImGui::OpenPopup(m_contextMenuPopupId.c_str());
-                m_shouldOpenContextMenu = false;
-        }
-        renderContextMenu(m_contextMenuPopupId);
-    }
-    // Handle rename modal
-    if (m_isRenaming) {
-        renderRenameModal();
     }
 }
 

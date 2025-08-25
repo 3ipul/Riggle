@@ -1,31 +1,47 @@
-# Project Architecture:
+# Riggle
 
-```
-Riggle/                         ← Root of the project
-├── CMakeLists.txt              ← Top-level build configuration
-├── README.md                   ← This file
-├── assets/                     ← Contains PNGs, rigs, fonts, and other resources like character/object images.
-├── external/                   ← Houses external libraries, such as SFML and ImGui-SFML. This might include optional submodules or cloned repositories.
-├── common/                     ← Provides shared math and utility headers used across different parts of the project.
-├── Riggle_Core/                ← The core reusable animation system, designed to operate independently without dependencies on SFML or ImGui.
-│   ├── include/                ← Public header files for the animation system components.
-│   │   └── Riggle_Core/
-│   │       └── Physics/        ← (Future) Contains components for physics simulations, such as a Verlet simulator for dynamic bones.
-│   └── src/                    ← Source files for the core animation system.
-│   │   └── Physics/
-│   └── CMakeLists.txt          ← Build configuration for the Riggle_Core library.
-├── Riggle_Editor/              ← The actual GUI-based editor application for Riggle.
-    ├── include/                ← Public header files for the editor application.
-    │   └── Riggle_Editor/
-    │       ├── Panels/         ← Header files for various editor panels (e.g., Viewport, Timeline, Hierarchy, Properties).
-    │       ├── Render/         ← Header files for rendering components (e.g., BoneRenderer, ImageRenderer).
-    │       └── Export/         ← Header files for export functionalities (e.g., JsonExporter, PngExporter).
-    ├── src/                    ← Source files for the editor application.
-    │   ├── main.cpp            ← The application's entry point.
-    │   ├── Panels/             ← Source files for the editor panels.
-    │   ├── Render/             ← Source files for rendering components.
-    │   └── Export/             ← Source files for export functionalities.
-    └── CMakeLists.txt  
-```
+**Riggle** is a lightweight, open-source 2D skeletal animation tool built for developers, educators, and creators of interactive media. It bridges the gap between overly complex professional tools and limited basic software by offering a streamlined, intuitive animation workflow.
 
-## Run the `build.bat` from `Riggle/script/`
+---
+
+## Features
+
+- **Skeletal Hierarchy System**: Create parent-child bone structures for flexible character rigging.
+- **Forward Kinematics (FK)**: Directly manipulate joints with precision.
+- **Inverse Kinematics (IK)**: Easily pose characters using a CCD-based solver.
+- **Sprite Import & Binding**: Import character parts and bind them to bones with intuitive workflows.
+- **Timeline-Based Animation**: Keyframe animations with linear interpolation and playback tools.
+- **Multi-Format Export**: Export animations as structured JSON or PNG image sequences.
+- **Clean, Dockable GUI**: Built using ImGui, featuring asset panels, hierarchy view, timeline, and more.
+---
+
+## Build Instructions
+
+### Prerequisites
+
+To build Riggle, ensure the following tools and libraries are installed:
+
+- [Microsoft Visual Studio](https://visualstudio.microsoft.com/) (MSVC) — recent version with C++ and SFML 3.0 support
+- [CMake](https://cmake.org/) — for managing the build process
+
+### Building the Project
+
+**1. Clone or download the repository.**
+
+**2. Navigate to the `Script/` directory and run one of the provided build scripts:**
+
+#### Debug Build:
+```bash
+./Script/build_debug.bat
+```
+#### Release Build:
+```bash
+./Script/build_release.bat
+```
+These scripts will automatically build the project using CMake and MSVC.
+
+---
+
+## Downloads
+
+You can download recent releases from the [release](https://github.com/3ipul/Riggle/releases) tab.

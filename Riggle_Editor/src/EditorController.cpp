@@ -2,6 +2,7 @@
 #include "Editor/Export/JSONExporter.h"
 #include "Editor/Export/PNGExporter.h"
 #include <imgui.h>
+#include <imgui_internal.h>
 #include <iostream>
 
 namespace Riggle {
@@ -23,6 +24,8 @@ EditorController::EditorController()
     , m_outputPath("")
     , m_projectName("MyProject")
     , m_animationName("MyAnimation")
+    , m_showResetLayoutConfirmation(false)
+    , m_resetLayoutRequested(false)
 {
     initializePanels();
     initializeExportSystem();
@@ -55,9 +58,17 @@ void EditorController::render(sf::RenderWindow& window) {
     if (m_viewportPanel) {
         m_viewportPanel->render();
     }
+
+    if(m_assetPanel) {
+        m_assetPanel->render();
+    }
     
     if (m_assetBrowserPanel) {
         m_assetBrowserPanel->render();
+    }
+
+    if (m_hierarchyPanel) {
+        m_hierarchyPanel->render();
     }
     
     if (m_propertyPanel) {
@@ -68,49 +79,13 @@ void EditorController::render(sf::RenderWindow& window) {
         m_animationPanel->render();
     }
 
-    renderAssetHierarchyTabs();
-
     // Render dialogs
     renderExportDialog();
     renderProjectSettingsDialog();
     renderExitConfirmation();
     renderControlsDialog();
     renderAboutDialog();
-}
-
-void EditorController::renderAssetHierarchyTabs() {
-    ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | 
-                            ImGuiWindowFlags_NoScrollbar |
-                            ImGuiWindowFlags_NoScrollWithMouse;
-    
-    // Create a window for the tabbed interface
-    if (ImGui::Begin("##AssetsHierarchy", nullptr, flags)) {
-        
-        // Tab bar
-        if (ImGui::BeginTabBar("AssetHierarchyTabs")) {
-            
-            // Assets tab
-            if (ImGui::BeginTabItem("Assets")) {
-                // Simply call the existing asset panel's render content
-                if (m_assetPanel) {
-                    m_assetPanel->renderContent(); // We need to add this method
-                }
-                ImGui::EndTabItem();
-            }
-            
-            // Hierarchy tab
-            if (ImGui::BeginTabItem("Hierarchy")) {
-                // Simply call the existing hierarchy panel's render content
-                if (m_hierarchyPanel) {
-                    m_hierarchyPanel->renderContent(); // We need to add this method
-                }
-                ImGui::EndTabItem();
-            }
-            
-            ImGui::EndTabBar();
-        }
-    }
-    ImGui::End();
+    renderLayoutResetConfirmationDialog();
 }
 
 void EditorController::handleEvent(const sf::Event& event) {
@@ -589,11 +564,7 @@ void EditorController::renderMainMenuBar() {
             ImGui::Separator();
             if (ImGui::MenuItem("Reset Layout")) {
                 // Reset all panels to visible
-                for (auto& panel : m_panels) {
-                    if (panel) {
-                        panel->setVisible(true);
-                    }
-                }
+                m_showResetLayoutConfirmation = true;
             }
             ImGui::Separator();
             if (ImGui::MenuItem("Reset View")) {
@@ -1103,11 +1074,6 @@ void EditorController::renderExportDialog() {
         
         ImGui::EndPopup();
     }
-    
-    // // Open the popup if needed
-    // if (m_showExportDialog && !ImGui::IsPopupOpen("Export")) {
-    //     ImGui::OpenPopup("Export");
-    // }
 }
 
 void EditorController::performExport() {
@@ -1244,6 +1210,68 @@ void EditorController::renderAboutDialog() {
             m_showAboutDialog = false;
         }
         
+        ImGui::EndPopup();
+    }
+}
+
+void EditorController::setupInitialDockLayout(ImGuiID dockspace_id) {
+    ImGui::DockBuilderRemoveNode(dockspace_id); // Clear previous layout
+    ImGui::DockBuilderAddNode(dockspace_id, ImGuiDockNodeFlags_DockSpace);
+    ImGui::DockBuilderSetNodeSize(dockspace_id, ImGui::GetMainViewport()->Size);
+
+    // Base dock id to split from
+    ImGuiID dock_main_id = dockspace_id;
+
+    // Split into left, right, and bottom
+    ImGuiID dock_id_left   = ImGui::DockBuilderSplitNode(dock_main_id, ImGuiDir_Left, 0.25f, nullptr, &dock_main_id);
+    ImGuiID dock_id_bottom = ImGui::DockBuilderSplitNode(dock_main_id, ImGuiDir_Down, 0.28f, nullptr, &dock_main_id);
+    ImGuiID dock_id_right  = ImGui::DockBuilderSplitNode(dock_main_id, ImGuiDir_Right, 0.28f, nullptr, &dock_main_id);
+
+    // Split left into top and bottom
+    ImGuiID dock_id_left_top = ImGui::DockBuilderSplitNode(dock_id_left, ImGuiDir_Up, 0.60f, nullptr, &dock_id_left);
+
+    // Dock windows
+    ImGui::DockBuilderDockWindow("Assets", dock_id_left_top);
+    ImGui::DockBuilderDockWindow("Hierarchy", dock_id_left_top);
+
+    ImGui::DockBuilderDockWindow("Asset Browser", dock_id_left);       
+
+    ImGui::DockBuilderDockWindow("Viewport", dock_main_id);            
+    ImGui::DockBuilderDockWindow("Properties", dock_id_right);         
+    ImGui::DockBuilderDockWindow("Animation", dock_id_bottom);
+
+    ImGui::DockBuilderFinish(dockspace_id);
+}
+
+void EditorController::renderLayoutResetConfirmationDialog() {
+    if (m_showResetLayoutConfirmation) {
+    ImGui::OpenPopup("Reset Layout?");
+    }
+
+    // Center the popup
+    ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+    ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+
+    if (ImGui::BeginPopupModal("Reset Layout?", &m_showResetLayoutConfirmation, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::Spacing();
+        ImGui::Text("Are you sure you want to reset the panel layout?");
+        ImGui::Spacing();
+
+        if (ImGui::Button("Yes")) {
+            for (auto& panel : m_panels) {
+                if (panel) {
+                    panel->setVisible(true);
+                }
+            }
+            m_resetLayoutRequested = true;
+            m_showResetLayoutConfirmation = false;
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("No")) {
+            m_showResetLayoutConfirmation = false;
+            ImGui::CloseCurrentPopup();
+        }
         ImGui::EndPopup();
     }
 }

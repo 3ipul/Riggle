@@ -96,7 +96,6 @@ void ViewportPanel::render() {
             }
 
             ImGui::EndChild();
-            ImGui::PopStyleVar();
         }
         
         // Status bar (fixed height)
@@ -113,7 +112,6 @@ void ViewportPanel::render() {
             }
         }
     }
-
     ImGui::End();
 }
 

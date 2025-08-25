@@ -37,21 +37,6 @@ void AssetPanel::render() {
     ImGui::End();
 }
 
-void AssetPanel::renderContent() {
-    // Render just the content without the ImGui::Begin/End wrapper
-    if (!m_character) {
-        ImGui::Text("No character loaded");
-    } else {
-        const auto& sprites = m_character->getSprites();
-        
-        if (sprites.empty()) {
-            renderEmptyState();
-        } else {
-            renderSpriteList();
-        }
-    }
-}
-
 void AssetPanel::update(sf::RenderWindow& window) {
     // No update logic needed for now
 }
@@ -310,7 +295,8 @@ void AssetPanel::renderSpriteItem(Sprite* sprite, size_t index) {
     
     // Move cursor to next item position
     ImGui::SetCursorPos(ImVec2(startPos.x, startPos.y + itemHeight));
-    
+    ImGui::Dummy(ImVec2(1, 1));
+
     ImGui::PopID();
 }
 

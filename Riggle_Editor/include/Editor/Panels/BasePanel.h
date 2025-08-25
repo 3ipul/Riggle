@@ -13,11 +13,6 @@ public:
     virtual void update(sf::RenderWindow& window) {}
     virtual void handleEvent(const sf::Event& event) {}
 
-    // For content only rendering
-    virtual void renderContent() {
-        render();
-    }
-
     // Panel state
     bool isVisible() const { return m_isVisible; }
     void setVisible(bool visible) { m_isVisible = visible; }

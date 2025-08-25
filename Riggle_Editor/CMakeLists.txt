@@ -46,8 +46,22 @@ add_executable(Riggle_Editor
     src/Utils/FileDialogManager.cpp
     src/Utils/miniz.c
     src/Project/ProjectManager.cpp
-    # src/ToolMode.cpp
-    # Add other source files...
+)
+
+# Group SFML Debug Libraries
+set(SFML_LIBS_DEBUG
+    ${SFML_LIB_DIR}/sfml-graphics-s-d.lib
+    ${SFML_LIB_DIR}/sfml-window-s-d.lib
+    ${SFML_LIB_DIR}/sfml-system-s-d.lib
+    ${SFML_LIB_DIR}/freetyped.lib
+)
+
+# Group SFML Release Libraries
+set(SFML_LIBS_RELEASE
+    ${SFML_LIB_DIR}/sfml-graphics-s.lib
+    ${SFML_LIB_DIR}/sfml-window-s.lib
+    ${SFML_LIB_DIR}/sfml-system-s.lib
+    ${SFML_LIB_DIR}/freetype.lib
 )
 
 # Link libraries with debug/release variants
@@ -55,16 +69,9 @@ target_link_libraries(Riggle_Editor PRIVATE
     Riggle_Core
     # common
     ImGui-SFML
-    # SFML libraries
-    "$<$<CONFIG:Debug>:${SFML_LIB_DIR}/sfml-graphics-s-d.lib>"
-    "$<$<CONFIG:Release>:${SFML_LIB_DIR}/sfml-graphics-s.lib>"
-    "$<$<CONFIG:Debug>:${SFML_LIB_DIR}/sfml-window-s-d.lib>"
-    "$<$<CONFIG:Release>:${SFML_LIB_DIR}/sfml-window-s.lib>"
-    "$<$<CONFIG:Debug>:${SFML_LIB_DIR}/sfml-system-s-d.lib>"
-    "$<$<CONFIG:Release>:${SFML_LIB_DIR}/sfml-system-s.lib>"
-    # FreeType (static versions)
-    "$<$<CONFIG:Debug>:${SFML_LIB_DIR}/freetyped.lib>"
-    "$<$<CONFIG:Release>:${SFML_LIB_DIR}/freetype.lib>"
+    # SFML libraries and Freetype
+    $<$<CONFIG:Debug>:${SFML_LIBS_DEBUG}>
+    $<$<CONFIG:Release>:${SFML_LIBS_RELEASE}>
 )
 
 # Windows dependencies (static linking)
@@ -79,6 +86,13 @@ if(WIN32)
     target_compile_definitions(Riggle_Editor PRIVATE
         SFML_STATIC
         FREETYPE_STATIC
+    )
+
+    # Hide console window on Windows Release builds
+    target_link_options(Riggle_Editor PRIVATE
+        $<$<CONFIG:Debug>:/PDBALTPATH:${SFML_LIB_DIR}/Debug>
+        $<$<CONFIG:Release>:/SUBSYSTEM:WINDOWS>
+        $<$<CONFIG:Release>:/ENTRY:mainCRTStartup>
     )
 endif()
 

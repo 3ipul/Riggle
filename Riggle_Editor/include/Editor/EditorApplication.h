@@ -34,6 +34,7 @@ private:
     std::unique_ptr<EditorController> m_editorController;
     
     // Methods
+    void renderDockSpace();
     void renderStartupWindow();
     void startEditor();
 

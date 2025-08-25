@@ -40,6 +40,12 @@ public:
     // Character access
     Character* getCharacter() const { return m_character.get(); }
 
+    // Layout management
+    void setupInitialDockLayout(ImGuiID dockspace_id);
+    bool isLayoutResetRequested() const { return m_resetLayoutRequested; }
+    void requestLayoutReset() { m_resetLayoutRequested = true; }
+    void clearLayoutResetRequest() { m_resetLayoutRequested = false; }
+
 private:
     // Panel management
     std::vector<std::unique_ptr<BasePanel>> m_panels;
@@ -92,12 +98,15 @@ private:
     
     // Rendering
     void renderMainMenuBar();
-    void renderAssetHierarchyTabs();
     void renderExitConfirmation();
     void renderControlsDialog();
     void renderAboutDialog();
     void renderProjectSettingsDialog();
-    
+
+    void renderLayoutResetConfirmationDialog();
+    bool m_showResetLayoutConfirmation = false;
+    bool m_resetLayoutRequested = false;
+
     // Project management
     void initializeProjectSystem();
     void newProject();             
