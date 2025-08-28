@@ -60,6 +60,11 @@ private:
     std::unique_ptr<ProjectManager> m_projectManager;
     std::string m_currentProjectPath;
     ProjectMetadata m_currentProjectMetadata;
+
+    char m_projectSettingsName[256] = {};
+    char m_projectSettingsAuthor[256] = {};
+    char m_projectSettingsDescription[512] = {};
+    bool m_projectSettingsDialogInitialized = false;
     
     // Character
     std::unique_ptr<Character> m_character;
@@ -123,8 +128,8 @@ private:
     bool m_exportProject; // true for project, false for animation
     char m_outputPath[512];
     char m_projectName[256];
-    char m_animationName[256];
     std::string m_lastExportError;
+    std::vector<bool> m_exportAnimationSelections;
     
     // Export methods
     void initializeExportSystem();

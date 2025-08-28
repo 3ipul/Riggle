@@ -70,8 +70,8 @@ bool PNGSequenceExporter::renderFrame(float time, const ExportAnimation& animati
         return false;
     }
 
-    // Clear with transparent background
-    renderTexture.clear(sf::Color::Transparent);
+    // Clear with background color
+    renderTexture.clear(m_backgroundColor);
 
     // Step 1: Apply animation to bones (replicate Animation::applyAtTime)
     std::vector<ExportBone> animatedBones = bones;
@@ -110,14 +110,18 @@ bool PNGSequenceExporter::renderFrame(float time, const ExportAnimation& animati
         sf::Vector2u textureSize = texture->getSize();
         sfSprite.setOrigin({textureSize.x * 0.5f, textureSize.y * 0.5f});
         
-        // Apply world transform (center the view in the render target)
+        // Center character in frame, apply zoom
         sfSprite.setPosition({
-            spriteWorldTransform.position.x + m_width * 0.5f,
-            spriteWorldTransform.position.y + m_height * 0.5f
+            spriteWorldTransform.position.x * m_zoom + m_width * 0.5f,
+            spriteWorldTransform.position.y * m_zoom + m_height * 0.5f
         });
-        // sfSprite.setRotation(spriteWorldTransform.rotation * 180.0f / 3.14159f); // Convert to degrees
+        
+        sfSprite.setScale({
+            spriteWorldTransform.scale.x * m_zoom,
+            spriteWorldTransform.scale.y * m_zoom
+        });
+
         sfSprite.setRotation(sf::degrees(spriteWorldTransform.rotation * 180.f / 3.14159265f));
-        sfSprite.setScale({spriteWorldTransform.scale.x, spriteWorldTransform.scale.y});
 
         renderTexture.draw(sfSprite);
     }
@@ -127,6 +131,35 @@ bool PNGSequenceExporter::renderFrame(float time, const ExportAnimation& animati
     sf::Image image = renderTexture.getTexture().copyToImage();
     
     return image.saveToFile(framePath);
+}
+
+void PNGSequenceExporter::updateResolution() {
+    int baseWidth = 1280, baseHeight = 720;
+    if (m_resolutionPreset == 1) { baseWidth = 1920; baseHeight = 1080; }
+    else if (m_resolutionPreset == 2) { baseWidth = 2560; baseHeight = 1440; }
+
+    switch (m_aspectRatioIndex) {
+        case 0: // 16:9
+            m_width = baseWidth;
+            m_height = baseHeight;
+            break;
+        case 1: // 4:3
+            m_width = baseWidth;
+            m_height = baseWidth * 3 / 4;
+            break;
+        case 2: // 1:1
+            m_width = baseWidth;
+            m_height = baseWidth;
+            break;
+        case 3: // 21:9
+            m_width = baseWidth;
+            m_height = baseWidth * 9 / 21;
+            break;
+        default:
+            m_width = baseWidth;
+            m_height = baseHeight;
+            break;
+    }
 }
 
 void PNGSequenceExporter::applyAnimationToBones(std::vector<ExportBone>& animatedBones, 

@@ -20,11 +20,22 @@ public:
     void setFrameRate(int fps) { m_frameRate = fps; }
     void setResolution(int width, int height) { m_width = width; m_height = height; }
 
+    void setZoom(float zoom) { m_zoom = zoom; }
+    void setBackgroundColor(const sf::Color& color) { m_backgroundColor = color; }
+    void setResolutionPreset(int presetIdx) { m_resolutionPreset = presetIdx; updateResolution(); }
+    void setAspectRatioIndex(int idx) { m_aspectRatioIndex = idx; updateResolution(); }
+
 private:
     int m_frameRate;
     int m_width;
     int m_height;
-    
+
+    float m_zoom = 1.0f;
+    sf::Color m_backgroundColor = sf::Color::Transparent;
+    int m_resolutionPreset = 1;
+    int m_aspectRatioIndex = 0;
+    void updateResolution();
+
     // Texture cache for performance
     mutable std::map<std::string, sf::Texture> m_textureCache;
     

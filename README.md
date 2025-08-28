@@ -44,7 +44,7 @@ These scripts will automatically build and run the project using CMake and MSVC.
 
 ---
 
-### Platform Support
+## Platform Support
 
 Currently, Riggle officially supports **Windows** only and requires **Microsoft Visual Studio (MSVC)** for building and running.
 
@@ -71,5 +71,6 @@ This project bundles the following third-party libraries:
 - [Dear ImGui (Docking Branch)](https://github.com/ocornut/imgui/tree/docking) – MIT License ([View License](https://github.com/ocornut/imgui/blob/docking/LICENSE.txt))
 - [ImGui-SFML](https://github.com/SFML/imgui-sfml) (modified) – MIT License ([View License](https://github.com/SFML/imgui-sfml/blob/master/LICENSE))
 - [SFML 3.0](https://www.sfml-dev.org/) – zlib/libpng License ([View License](https://github.com/SFML/SFML/blob/master/license.md))
+- [miniz](https://github.com/richgel999/miniz) – MIT License ([View License](https://github.com/richgel999/miniz/blob/master/LICENSE))
 
 All included third-party libraries retain their original licenses and are credited to their respective authors.

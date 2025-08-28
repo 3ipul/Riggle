@@ -3,6 +3,7 @@
 #include "Editor/Export/PNGExporter.h"
 #include <imgui.h>
 #include <imgui_internal.h>
+#include <filesystem>
 #include <iostream>
 
 namespace Riggle {
@@ -23,7 +24,7 @@ EditorController::EditorController()
     , m_exportProject(true)
     , m_outputPath("")
     , m_projectName("MyProject")
-    , m_animationName("MyAnimation")
+    //, m_animationName("MyAnimation")
     , m_showResetLayoutConfirmation(false)
     , m_resetLayoutRequested(false)
 {
@@ -89,6 +90,11 @@ void EditorController::render(sf::RenderWindow& window) {
 }
 
 void EditorController::handleEvent(const sf::Event& event) {
+    // Block global shortcuts if ImGui wants keyboard
+    if (ImGui::GetIO().WantCaptureKeyboard) {
+        return;
+    }
+
     // Handle tool switching shortcuts
     if (event.is<sf::Event::KeyPressed>()) {
         const auto* keyPressed = event.getIf<sf::Event::KeyPressed>();
@@ -737,6 +743,15 @@ void EditorController::newProject() {
     if (hasUnsavedChanges()) {
         std::cout << "Warning: You have unsaved changes!" << std::endl;
     }
+
+    // Update dialog buffers
+    strncpy(m_projectSettingsName, m_currentProjectMetadata.name.c_str(), sizeof(m_projectSettingsName) - 1);
+    m_projectSettingsName[sizeof(m_projectSettingsName) - 1] = '\0';
+    strncpy(m_projectSettingsAuthor, m_currentProjectMetadata.author.c_str(), sizeof(m_projectSettingsAuthor) - 1);
+    m_projectSettingsAuthor[sizeof(m_projectSettingsAuthor) - 1] = '\0';
+    strncpy(m_projectSettingsDescription, m_currentProjectMetadata.description.c_str(), sizeof(m_projectSettingsDescription) - 1);
+    m_projectSettingsDescription[sizeof(m_projectSettingsDescription) - 1] = '\0';
+    m_projectSettingsDialogInitialized = true;
     
     // Create new character
     createDefaultCharacter();
@@ -811,10 +826,24 @@ void EditorController::loadProject() {
         ProjectMetadata metadata;
         
         if (m_projectManager->loadProject(loadedCharacter, filePath, metadata)) {
+            if (metadata.name.empty() || metadata.name == "Untitled Project") {
+                std::filesystem::path path(filePath);
+                metadata.name = path.stem().string();
+            }
+
             // Replace current character
             m_character = std::move(loadedCharacter);
             m_currentProjectPath = filePath;
             m_currentProjectMetadata = metadata;
+
+            // Update dialog buffers
+            strncpy(m_projectSettingsName, metadata.name.c_str(), sizeof(m_projectSettingsName) - 1);
+            m_projectSettingsName[sizeof(m_projectSettingsName) - 1] = '\0';
+            strncpy(m_projectSettingsAuthor, metadata.author.c_str(), sizeof(m_projectSettingsAuthor) - 1);
+            m_projectSettingsAuthor[sizeof(m_projectSettingsAuthor) - 1] = '\0';
+            strncpy(m_projectSettingsDescription, metadata.description.c_str(), sizeof(m_projectSettingsDescription) - 1);
+            m_projectSettingsDescription[sizeof(m_projectSettingsDescription) - 1] = '\0';
+            m_projectSettingsDialogInitialized = true;
             
             // Update all panels with loaded character
             updateAllPanelsWithCharacter();
@@ -843,55 +872,55 @@ void EditorController::updateAllPanelsWithCharacter() {
 
 void EditorController::renderProjectSettingsDialog() {
     if (!m_showProjectSettingsDialog) return;
-    
+
     if (!ImGui::IsPopupOpen("Project Settings")) {
         ImGui::OpenPopup("Project Settings");
     }
-    
+
     ImVec2 center = ImGui::GetMainViewport()->GetCenter();
     ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
     ImGui::SetNextWindowSize(ImVec2(400, 300), ImGuiCond_FirstUseEver);
-    
+
     if (ImGui::BeginPopupModal("Project Settings", &m_showProjectSettingsDialog)) {
-        static char name[256], author[256], description[512];
-        
-        // Initialize with current values
-        static bool initialized = false;
-        if (!initialized) {
-            strncpy(name, m_currentProjectMetadata.name.c_str(), sizeof(name) - 1);
-            strncpy(author, m_currentProjectMetadata.author.c_str(), sizeof(author) - 1);
-            strncpy(description, m_currentProjectMetadata.description.c_str(), sizeof(description) - 1);
-            initialized = true;
+        // Initialize with current values if not already done
+        if (!m_projectSettingsDialogInitialized) {
+            strncpy(m_projectSettingsName, m_currentProjectMetadata.name.c_str(), sizeof(m_projectSettingsName) - 1);
+            m_projectSettingsName[sizeof(m_projectSettingsName) - 1] = '\0';
+            strncpy(m_projectSettingsAuthor, m_currentProjectMetadata.author.c_str(), sizeof(m_projectSettingsAuthor) - 1);
+            m_projectSettingsAuthor[sizeof(m_projectSettingsAuthor) - 1] = '\0';
+            strncpy(m_projectSettingsDescription, m_currentProjectMetadata.description.c_str(), sizeof(m_projectSettingsDescription) - 1);
+            m_projectSettingsDescription[sizeof(m_projectSettingsDescription) - 1] = '\0';
+            m_projectSettingsDialogInitialized = true;
         }
-        
+
         ImGui::Text("Project Information:");
         ImGui::Separator();
-        
-        ImGui::InputText("Project Name", name, sizeof(name));
-        ImGui::InputText("Author", author, sizeof(author));
-        ImGui::InputTextMultiline("Description", description, sizeof(description), ImVec2(0, 100));
-        
+
+        ImGui::InputText("Project Name", m_projectSettingsName, sizeof(m_projectSettingsName));
+        ImGui::InputText("Author", m_projectSettingsAuthor, sizeof(m_projectSettingsAuthor));
+        ImGui::InputTextMultiline("Description", m_projectSettingsDescription, sizeof(m_projectSettingsDescription), ImVec2(0, 100));
+
         ImGui::Separator();
         ImGui::Text("Created: %s", m_currentProjectMetadata.createdDate.c_str());
         ImGui::Text("Modified: %s", m_currentProjectMetadata.modifiedDate.c_str());
-        
+
         ImGui::Separator();
-        
+
         if (ImGui::Button("Save")) {
-            m_currentProjectMetadata.name = name;
-            m_currentProjectMetadata.author = author;
-            m_currentProjectMetadata.description = description;
+            m_currentProjectMetadata.name = m_projectSettingsName;
+            m_currentProjectMetadata.author = m_projectSettingsAuthor;
+            m_currentProjectMetadata.description = m_projectSettingsDescription;
             m_hasUnsavedChanges = true;
             m_showProjectSettingsDialog = false;
-            initialized = false;
+            m_projectSettingsDialogInitialized = false;
         }
-        
+
         ImGui::SameLine();
         if (ImGui::Button("Cancel")) {
             m_showProjectSettingsDialog = false;
-            initialized = false;
+            m_projectSettingsDialogInitialized = false;
         }
-        
+
         ImGui::EndPopup();
     }
 }
@@ -960,20 +989,98 @@ void EditorController::renderExportDialog() {
         } else {
             // Animation export options
             ImGui::Text("PNG Sequence Export Settings:");
-            ImGui::InputText("Animation Name", m_animationName, sizeof(m_animationName));
+            //ImGui::InputText("Animation Name", m_animationName, sizeof(m_animationName));
             
-            // Show available animations
+            // Resolution presets
+            static const char* resolutions[] = { "1280x720", "1920x1080", "2560x1440" };
+            static int resIdx = 1;
+            ImGui::Text("Resolution:");
+            if (ImGui::Combo("##Resolution", &resIdx, resolutions, IM_ARRAYSIZE(resolutions))) {
+                auto animationExporters = m_exportManager->getAnimationExporters();
+                if (m_selectedAnimationExporter < static_cast<int>(animationExporters.size())) {
+                    auto* pngExporter = dynamic_cast<PNGSequenceExporter*>(animationExporters[m_selectedAnimationExporter]);
+                    if (pngExporter) pngExporter->setResolutionPreset(resIdx);
+                }
+            }
+
+            // Aspect ratio presets
+            static const char* aspectRatios[] = { "16:9", "4:3", "1:1", "21:9" };
+            static int aspectIdx = 0;
+            ImGui::Text("Aspect Ratio:");
+            if (ImGui::Combo("##AspectRatio", &aspectIdx, aspectRatios, IM_ARRAYSIZE(aspectRatios))) {
+                auto animationExporters = m_exportManager->getAnimationExporters();
+                if (m_selectedAnimationExporter < static_cast<int>(animationExporters.size())) {
+                    auto* pngExporter = dynamic_cast<PNGSequenceExporter*>(animationExporters[m_selectedAnimationExporter]);
+                    if (pngExporter) pngExporter->setAspectRatioIndex(aspectIdx);
+                }
+            }
+
+            // Frame rate presets
+            static const char* fpsOptions[] = { "24", "30", "60" };
+            static int fpsIdx = 1;
+            ImGui::Text("Frame Rate:");
+            if (ImGui::Combo("##FrameRate", &fpsIdx, fpsOptions, IM_ARRAYSIZE(fpsOptions))) {
+                int fps = 24;
+                if (fpsIdx == 1) fps = 30;
+                else if (fpsIdx == 2) fps = 60;
+                auto animationExporters = m_exportManager->getAnimationExporters();
+                if (m_selectedAnimationExporter < static_cast<int>(animationExporters.size())) {
+                    auto* pngExporter = dynamic_cast<PNGSequenceExporter*>(animationExporters[m_selectedAnimationExporter]);
+                    if (pngExporter) pngExporter->setFrameRate(fps);
+                }
+            }
+
+            // Zoom slider
+            static float zoom = 1.0f;
+            ImGui::Text("Zoom:");
+            if (ImGui::SliderFloat("##Zoom", &zoom, 0.1f, 2.0f, "%.2fx")) {
+                auto animationExporters = m_exportManager->getAnimationExporters();
+                if (m_selectedAnimationExporter < static_cast<int>(animationExporters.size())) {
+                    auto* pngExporter = dynamic_cast<PNGSequenceExporter*>(animationExporters[m_selectedAnimationExporter]);
+                    if (pngExporter) pngExporter->setZoom(zoom);
+                }
+            }
+
+            // Background color picker
+            static float bgColor[4] = { 1, 1, 1, 0 }; // Default transparent
+            ImGui::Text("Background Color:");
+            if (ImGui::ColorEdit4("##BGColor", bgColor)) {
+                sf::Color color(
+                    static_cast<std::uint8_t>(bgColor[0] * 255),
+                    static_cast<std::uint8_t>(bgColor[1] * 255),
+                    static_cast<std::uint8_t>(bgColor[2] * 255),
+                    static_cast<std::uint8_t>(bgColor[3] * 255)
+                );
+                auto animationExporters = m_exportManager->getAnimationExporters();
+                if (m_selectedAnimationExporter < static_cast<int>(animationExporters.size())) {
+                    auto* pngExporter = dynamic_cast<PNGSequenceExporter*>(animationExporters[m_selectedAnimationExporter]);
+                    if (pngExporter) pngExporter->setBackgroundColor(color);
+                }
+            }
+            
+            // Show animations to select
             if (m_character) {
                 const auto& animations = m_character->getAnimations();
+                // Resize selection vector if needed
+                if (m_exportAnimationSelections.size() != animations.size()) {
+                    m_exportAnimationSelections.assign(animations.size(), false);
+                }
                 if (animations.empty()) {
                     ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.5f, 1.0f), "No animations available to export!");
                 } else {
-                    ImGui::Text("Available animations:");
-                    for (const auto& anim : animations) {
-                        if (anim) {
-                            if (ImGui::Selectable(anim->getName().c_str())) {
-                                strncpy(m_animationName, anim->getName().c_str(), sizeof(m_animationName) - 1);
-                                m_animationName[sizeof(m_animationName) - 1] = '\0';
+                    ImGui::Text("Select animations to export:");
+                    if (ImGui::Button("Select All")) {
+                        std::fill(m_exportAnimationSelections.begin(), m_exportAnimationSelections.end(), true);
+                    }
+                    ImGui::SameLine();
+                    if (ImGui::Button("Select None")) {
+                        std::fill(m_exportAnimationSelections.begin(), m_exportAnimationSelections.end(), false);
+                    }
+                    for (size_t i = 0; i < animations.size(); ++i) {
+                        if (animations[i]) {
+                            bool checked = m_exportAnimationSelections[i];
+                            if (ImGui::Checkbox(animations[i]->getName().c_str(), &checked)) {
+                                m_exportAnimationSelections[i] = checked ? true : false;
                             }
                         }
                     }
@@ -1013,19 +1120,28 @@ void EditorController::renderExportDialog() {
         ImGui::SameLine();
         if (ImGui::Button("Browse...")) {
             std::string selectedPath;
-            bool isDirectory = false;
-            
-            // Determine if we need directory or file dialog
-            if (!m_exportProject) {
+            if (m_exportProject) {
+                // JSON export: show save file dialog with default name and .json filter
+                std::vector<FileFilter> filters = {
+                    FileFilter("JSON Files", ".json"),
+                    FileFilter("All Files", ".*")
+                };
+                std::string defaultName = std::string(m_projectName) + ".json";
+                if (FileDialogManager::getInstance().saveFileDialog(selectedPath, filters, "", defaultName)) {
+                    strncpy(m_outputPath, selectedPath.c_str(), sizeof(m_outputPath) - 1);
+                    m_outputPath[sizeof(m_outputPath) - 1] = '\0';
+                }
+            } else {
+                // PNG sequence: keep current directory dialog logic
+                bool isDirectory = false;
                 auto animationExporters = m_exportManager->getAnimationExporters();
                 if (m_selectedAnimationExporter < static_cast<int>(animationExporters.size())) {
                     isDirectory = animationExporters[m_selectedAnimationExporter]->getFileExtension().empty();
                 }
-            }
-            
-            if (openFileDialog(selectedPath, isDirectory)) {
-                strncpy(m_outputPath, selectedPath.c_str(), sizeof(m_outputPath) - 1);
-                m_outputPath[sizeof(m_outputPath) - 1] = '\0';
+                if (openFileDialog(selectedPath, isDirectory)) {
+                    strncpy(m_outputPath, selectedPath.c_str(), sizeof(m_outputPath) - 1);
+                    m_outputPath[sizeof(m_outputPath) - 1] = '\0';
+                }
             }
         }
         
@@ -1087,20 +1203,31 @@ void EditorController::performExport() {
     
     try {
         if (m_exportProject) {
-            // Export project
+            // Export JSON data
             auto projectExporters = m_exportManager->getProjectExporters();
             if (m_selectedProjectExporter < static_cast<int>(projectExporters.size())) {
                 auto* exporter = projectExporters[m_selectedProjectExporter];
-                
-                // Build output path with extension if needed
+
+                // Build output path
                 std::string outputPath = m_outputPath;
                 std::string extension = exporter->getFileExtension();
+                std::string projectNameStr = m_projectName;
+                if (outputPath.empty()) {
+                    m_lastExportError = "Please specify an output path.";
+                    return;
+                }
+                // If outputPath is a directory, append project name
+                if (outputPath.back() == '/' || outputPath.back() == '\\' || 
+                    (outputPath.find('.') == std::string::npos)) {
+                    outputPath += projectNameStr;
+                }
+                // Ensure .json extension
                 if (!extension.empty() && outputPath.find(extension) == std::string::npos) {
                     outputPath += extension;
                 }
-                
-                success = m_exportManager->exportProject(*m_character, m_projectName, exporter, outputPath);
-                
+
+                success = m_exportManager->exportProject(*m_character, projectNameStr, exporter, outputPath);
+
                 if (success) {
                     std::cout << "Project exported successfully to: " << outputPath << std::endl;
                     m_showExportDialog = false;
@@ -1111,27 +1238,32 @@ void EditorController::performExport() {
                 m_lastExportError = "Invalid project exporter selected";
             }
         } else {
-            // Export animation
+            // Export animations
             auto animationExporters = m_exportManager->getAnimationExporters();
             if (m_selectedAnimationExporter < static_cast<int>(animationExporters.size())) {
                 auto* exporter = animationExporters[m_selectedAnimationExporter];
-                
-                // Check if animation exists
-                if (!m_character->findAnimation(m_animationName)) {
-                    m_lastExportError = "Animation '" + std::string(m_animationName) + "' not found";
-                    return;
+
+                const auto& animations = m_character->getAnimations();
+                bool anyExported = false;
+                for (size_t i = 0; i < m_exportAnimationSelections.size(); ++i) {
+                    if (m_exportAnimationSelections[i] && animations[i]) {
+                        std::string animName = animations[i]->getName();
+                        std::string animationFolder = std::string(m_outputPath) + "/" + animName;
+                        bool ok = m_exportManager->exportAnimation(*m_character, animName, exporter, animationFolder);
+                        if (ok) {
+                            std::cout << "Animation exported successfully to: " << animationFolder << std::endl;
+                            anyExported = true;
+                        } else {
+                            m_lastExportError += m_exportManager->getLastError() + "\n";
+                        }
+                    }
                 }
-                
-                success = m_exportManager->exportAnimation(*m_character, m_animationName, exporter, m_outputPath);
-                
-                if (success) {
-                    std::cout << "Animation exported successfully to: " << m_outputPath << std::endl;
+                if (anyExported) {
                     m_showExportDialog = false;
-                } else {
-                    m_lastExportError = m_exportManager->getLastError();
                 }
-            } else {
-                m_lastExportError = "Invalid animation exporter selected";
+                if (!anyExported && m_lastExportError.empty()) {
+                    m_lastExportError = "No animations selected for export";
+                }
             }
         }
     }
