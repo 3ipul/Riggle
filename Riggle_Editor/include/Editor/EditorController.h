@@ -77,6 +77,17 @@ private:
     bool m_showControlsDialog = false;
     bool m_showAboutDialog = false;
     bool m_showProjectSettingsDialog = false;
+
+    // Export dialog state
+    std::unique_ptr<ExportManager> m_exportManager;
+    bool m_showExportDialog;
+    int m_selectedProjectExporter;
+    int m_selectedAnimationExporter;
+    bool m_exportProject; // true for project, false for animation
+    char m_outputPath[512];
+    char m_projectName[256];
+    std::string m_lastExportError;
+    std::vector<bool> m_exportAnimationSelections;
     
     // Initialization
     void initializePanels();
@@ -119,17 +130,6 @@ private:
     void loadProject(); 
     void updateAllPanelsWithCharacter();           
     bool hasUnsavedChanges() const;
-    
-    // Export dialog state
-    std::unique_ptr<ExportManager> m_exportManager;
-    bool m_showExportDialog;
-    int m_selectedProjectExporter;
-    int m_selectedAnimationExporter;
-    bool m_exportProject; // true for project, false for animation
-    char m_outputPath[512];
-    char m_projectName[256];
-    std::string m_lastExportError;
-    std::vector<bool> m_exportAnimationSelections;
     
     // Export methods
     void initializeExportSystem();

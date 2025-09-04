@@ -22,7 +22,7 @@ Transform Sprite::getWorldTransform() const {
         // Apply binding offset and rotation
         Transform result;
         
-        // FIXED: Position calculation using proper offset transformation
+        // Position calculation using proper offset transformation
         float cosRot = std::cos(boneWorld.rotation);
         float sinRot = std::sin(boneWorld.rotation);
         

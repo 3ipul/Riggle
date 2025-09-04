@@ -29,7 +29,7 @@ struct TimelineState {
     
     // Timeline metrics
     float pixelsPerSecond = 60.0f;
-    float timelineHeight = 300.0f;
+    float timelineHeight = 200.0f;
     float trackHeight = 25.0f;
     float headerWidth = 150.0f;
 };
@@ -38,6 +38,10 @@ class AnimationPanel : public BasePanel {
 public:
     AnimationPanel();
     ~AnimationPanel() = default;
+
+    bool m_showAnimNameDialog = false;
+    char m_animNameBuffer[128] = {};
+    Animation* m_animToRename = nullptr;
     
     // BasePanel overrides
     void render() override;

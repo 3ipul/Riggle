@@ -73,11 +73,29 @@ void AnimationPanel::renderAnimationControls() {
     ImGui::SameLine();
     if (ImGui::Button("New")) {
         createNewAnimation();
+        const auto& animations = m_character->getAnimations();
+        if (!animations.empty()) {
+            Animation* newAnim = animations.back().get();
+            auto* player = m_character->getAnimationPlayer();
+            player->setAnimation(newAnim); // Set as current animation
+            strncpy(m_animNameBuffer, newAnim->getName().c_str(), sizeof(m_animNameBuffer));
+            m_animToRename = newAnim;
+            m_showAnimNameDialog = true;
+            ImGui::OpenPopup("Set animation name");
+        }
     }
     
     ImGui::SameLine();
     if (ImGui::Button("Delete") && currentAnim) {
         deleteAnimation(currentAnim->getName());
+    }
+
+    ImGui::SameLine();
+    if (ImGui::Button("Rename") && currentAnim) {
+        strncpy(m_animNameBuffer, currentAnim->getName().c_str(), sizeof(m_animNameBuffer));
+        m_animToRename = currentAnim;
+        m_showAnimNameDialog = true;
+        ImGui::OpenPopup("Set animation name");
     }
 
     // Playback controls
@@ -203,6 +221,28 @@ void AnimationPanel::renderAnimationControls() {
     if (ImGui::Checkbox("Loop", &isLooping)) {
         player->setLooping(isLooping);
     }
+
+    if (m_showAnimNameDialog) {
+        m_showAnimNameDialog = false;
+        ImGui::OpenPopup("Set animation name");
+    }
+    if (ImGui::BeginPopupModal("Set animation name", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::InputText("Name", m_animNameBuffer, sizeof(m_animNameBuffer));
+        if (ImGui::Button("OK")) {
+            std::string name(m_animNameBuffer);
+            if (m_animToRename && !name.empty()) {
+                m_animToRename->setName(name);
+            }
+            m_animToRename = nullptr;
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel")) {
+            m_animToRename = nullptr;
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
 }
 
 void AnimationPanel::renderTimeline() {
@@ -221,6 +261,21 @@ void AnimationPanel::renderTimeline() {
 
     ImGui::BeginChild("Timeline", ImVec2(0, m_state.timelineHeight), true);
     
+    // Handle zooming and scrolling with mouse wheel
+    if (ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows)) {
+        if (ImGui::GetIO().MouseWheel != 0.0f && !ImGui::IsAnyItemActive()) {
+            if (ImGui::GetIO().KeyShift) {
+                // Zoom
+                float zoomFactor = 1.0f + ImGui::GetIO().MouseWheel * 0.1f;
+                m_state.zoom = std::clamp(m_state.zoom * zoomFactor, 0.1f, 5.0f);
+            } else if (ImGui::GetIO().KeyCtrl) {
+                // Horizontal scroll
+                m_state.scrollX -= ImGui::GetIO().MouseWheel * 50.0f;
+                m_state.scrollX = std::max(0.0f, m_state.scrollX);
+            }
+        }
+    }
+
     // Store the starting position for consistent layout
     ImVec2 timelineStart = ImGui::GetCursorScreenPos();
     
@@ -480,26 +535,26 @@ void AnimationPanel::renderBoneTrack(const std::string& boneName, Animation* ani
 void AnimationPanel::renderKeyframes(const std::string& boneName, Animation* animation, float trackY) {
     auto* track = animation->getBoneTrack(boneName);
     if (!track) return;
-    
+
     ImDrawList* drawList = ImGui::GetWindowDrawList();
     float scaledPixelsPerSecond = m_state.pixelsPerSecond * m_state.zoom;
     ImVec2 canvasPos = ImGui::GetCursorScreenPos();
     ImVec2 canvasSize = ImGui::GetContentRegionAvail();
-    
+
     for (const auto& keyframe : track->getKeyframes()) {
         // Calculate x position accounting for scroll
         float x = (keyframe.time * scaledPixelsPerSecond) - m_state.scrollX;
         float screenX = canvasPos.x + m_state.headerWidth + x;
-        
+
         // Only draw if visible
         if (screenX >= canvasPos.x + m_state.headerWidth && screenX <= canvasPos.x + canvasSize.x) {
             ImVec2 center = ImVec2(screenX, trackY + m_state.trackHeight * 0.5f);
-            
-            bool isSelected = (m_state.selectedBone == boneName && 
-                             std::abs(m_state.selectedKeyframeTime - keyframe.time) < 0.001f);
-            
+
+            bool isSelected = (m_state.selectedBone == boneName &&
+                               std::abs(m_state.selectedKeyframeTime - keyframe.time) < 0.001f);
+
             ImU32 keyframeColor = isSelected ? IM_COL32(255, 255, 100, 255) : IM_COL32(100, 200, 100, 255);
-            
+
             // Diamond shape keyframe
             ImVec2 points[4] = {
                 ImVec2(center.x, center.y - 6),  // Top
@@ -507,9 +562,34 @@ void AnimationPanel::renderKeyframes(const std::string& boneName, Animation* ani
                 ImVec2(center.x, center.y + 6),  // Bottom
                 ImVec2(center.x - 6, center.y)   // Left
             };
-            
+
             drawList->AddConvexPolyFilled(points, 4, keyframeColor);
             drawList->AddPolyline(points, 4, IM_COL32(255, 255, 255, 255), true, 1.0f);
+
+            // --- Add hit detection and double-click for deletion ---
+            ImVec2 min = ImVec2(center.x - 7, center.y - 7);
+            ImVec2 max = ImVec2(center.x + 7, center.y + 7);
+            ImGui::SetCursorScreenPos(min);
+            ImGui::InvisibleButton(("keyframe_" + boneName + "_" + std::to_string(keyframe.time)).c_str(), ImVec2(14, 14));
+
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip("Time: %.3f\nDouble-click to delete", keyframe.time);
+            }
+
+            if (ImGui::IsItemClicked()) {
+                m_state.selectedBone = boneName;
+                m_state.selectedKeyframeTime = keyframe.time;
+            }
+
+            if (ImGui::IsItemClicked(0) && ImGui::IsMouseDoubleClicked(0)) {
+                // Double-click: delete this keyframe
+                animation->removeKeyframe(boneName, keyframe.time);
+                // Optionally clear selection if deleted
+                if (m_state.selectedBone == boneName && std::abs(m_state.selectedKeyframeTime - keyframe.time) < 0.001f) {
+                    m_state.selectedKeyframeTime = -1.0f;
+                }
+                break; // Keyframes list may be invalid after deletion
+            }
         }
     }
 }
@@ -571,7 +651,7 @@ void AnimationPanel::handleTimelineInteraction(float duration) {
     if (!canInteract) {
         return;
     }
-    
+
     // Handle time scrubbing - PRIORITY for ruler area, also works in content area
     if (ImGui::IsMouseClicked(0) && !ImGui::IsAnyItemActive()) {
         // Calculate relative X position from the start of the timeline (after header)
@@ -590,19 +670,6 @@ void AnimationPanel::handleTimelineInteraction(float duration) {
                     return; // Don't process other interactions
                 }
             }
-        }
-    }
-    
-    // Handle scrolling and zooming
-    if (ImGui::GetIO().MouseWheel != 0.0f && !ImGui::IsAnyItemActive()) {
-        if (ImGui::GetIO().KeyCtrl) {
-            // Zoom
-            float zoomFactor = 1.0f + ImGui::GetIO().MouseWheel * 0.1f;
-            m_state.zoom = std::clamp(m_state.zoom * zoomFactor, 0.1f, 5.0f);
-        } else {
-            // Horizontal scroll
-            m_state.scrollX -= ImGui::GetIO().MouseWheel * 50.0f;
-            m_state.scrollX = std::max(0.0f, m_state.scrollX);
         }
     }
 }
@@ -640,16 +707,34 @@ void AnimationPanel::createKeyframeForBone(const std::string& boneName) {
 }
 
 void AnimationPanel::setCurrentTime(float time) {
-    if (time < 0.0f) time = 0.0f;
-    m_state.currentTime = std::max(0.0f, time);
-    
+    // Playhead snapping logic: Snap to time step
+    float scaledPixelsPerSecond = m_state.pixelsPerSecond * m_state.zoom;
+    float pixelsPerStep = 80.0f;
+    float timePerStep = pixelsPerStep / scaledPixelsPerSecond;
+    float step = 1.0f;
+    if (timePerStep <= 0.1f) step = 0.1f;
+    else if (timePerStep <= 0.25f) step = 0.25f;
+    else if (timePerStep <= 0.5f) step = 0.5f;
+    else if (timePerStep <= 1.0f) step = 1.0f;
+    else if (timePerStep <= 2.0f) step = 2.0f;
+    else if (timePerStep <= 5.0f) step = 5.0f;
+    else if (timePerStep <= 10.0f) step = 10.0f;
+    else step = std::ceil(timePerStep / 10.0f) * 10.0f;
+
+    float minorStep = step / 5.0f;
+
+    // Snap time to nearest minor step
+    float snappedTime = std::round(time / minorStep) * minorStep;
+    if (snappedTime < 0.0f) snappedTime = 0.0f;
+    m_state.currentTime = snappedTime;
+
     // DISABLE manual edit mode during playhead updates
     bool wasInManualMode = false;
     if (m_character && m_character->isInManualBoneEditMode()) {
         wasInManualMode = true;
         m_character->setManualBoneEditMode(false);
     }
-    
+
     // Apply animation at current time
     if (m_character && m_character->getAnimationPlayer()) {
         auto* currentAnim = m_character->getAnimationPlayer()->getAnimation();
@@ -658,7 +743,7 @@ void AnimationPanel::setCurrentTime(float time) {
             m_character->getAnimationPlayer()->update(0.0f); // Force update
         }
     }
-    
+
     // RESTORE manual edit mode if it was enabled
     if (wasInManualMode && m_character) {
         m_character->setManualBoneEditMode(true);
@@ -688,13 +773,25 @@ void AnimationPanel::applyLastKeyframeToAllBones(Animation* animation) {
 
 void AnimationPanel::createNewAnimation() {
     if (!m_character) return;
-    
-    static int animCounter = 1;
-    std::string name = "Animation_" + std::to_string(animCounter++);
-    
+
+    // Find next available name
+    int animCounter = 1;
+    std::string name;
+    bool nameExists = true;
+    do {
+        name = "Animation_" + std::to_string(animCounter++);
+        nameExists = false;
+        for (const auto& anim : m_character->getAnimations()) {
+            if (anim && anim->getName() == name) {
+                nameExists = true;
+                break;
+            }
+        }
+    } while (nameExists);
+
     auto animation = std::make_unique<Animation>(name);
     m_character->addAnimation(std::move(animation));
-    
+
     std::cout << "Created new animation: " << name << std::endl;
 }
 

@@ -24,7 +24,6 @@ EditorController::EditorController()
     , m_exportProject(true)
     , m_outputPath("")
     , m_projectName("MyProject")
-    //, m_animationName("MyAnimation")
     , m_showResetLayoutConfirmation(false)
     , m_resetLayoutRequested(false)
 {
@@ -625,7 +624,8 @@ void EditorController::renderMainMenuBar() {
 void EditorController::onBoneDeleted(std::shared_ptr<Bone> bone) {
     if (!bone || !m_character || !m_character->getRig()) return;
     
-    std::cout << "Deleting bone: " << bone->getName() << std::endl;
+    std::string boneName = bone->getName();
+    std::cout << "Deleting bone: " << boneName << std::endl;
     
     // Clear selections if deleting selected bone
     if (m_hierarchyPanel && bone == m_hierarchyPanel->getSelectedBone()) {
@@ -640,7 +640,7 @@ void EditorController::onBoneDeleted(std::shared_ptr<Bone> bone) {
     }
     
     // Remove from rig
-    m_character->getRig()->removeBone(bone->getName());
+    m_character->getRig()->removeBone(boneName);
     
     m_hasUnsavedChanges = true;
 }

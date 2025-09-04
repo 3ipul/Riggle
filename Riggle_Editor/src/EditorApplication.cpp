@@ -25,7 +25,7 @@ EditorApplication::EditorApplication()
     int y = (desktop.size.y - windowSize.y) / 2;
     m_window.setPosition(sf::Vector2i(x, y));
 
-    m_logoLoaded = m_logoTexture.loadFromFile("Riggle_Editor/Assets/Riggle_logo.png");
+    m_logoLoaded = m_logoTexture.loadFromFile("assets/logo/riggle_startup_logo.png");
 }
 
 EditorApplication::~EditorApplication() {

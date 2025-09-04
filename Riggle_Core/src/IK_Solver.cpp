@@ -21,7 +21,7 @@ bool IKSolver::solveCCD(Rig* rig,std::shared_ptr<Bone> endEffector, const Vector
             return true; // Success
         }
 
-        // **Correct CCD: Iterate backwards from the end-effector's parent up the chain.**
+        // Iterate backwards from the end-effector's parent up the chain.**
         // The chain is ordered [Root-of-chain, ..., Parent, EndEffector].
         // So we loop from chain.size() - 2 down to 0.
         for (int i = chain.size() - 1; i >= 0; --i) {
