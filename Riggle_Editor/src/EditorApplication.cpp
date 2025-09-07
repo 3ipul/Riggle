@@ -12,10 +12,14 @@ EditorApplication::EditorApplication()
     , m_showAboutDialog(false)
     , m_window(sf::VideoMode({500, 400}), "Riggle - 2D Skeletal Animation Tool", sf::Style::Titlebar | sf::Style::Close)
     , m_editorController(nullptr)
+    , m_iconLoaded(false)
     , m_logoLoaded(false)
 {
     m_window.setFramerateLimit(60);
     
+    m_iconLoaded = m_iconImage.loadFromFile("assets/icon/riggle_icon.png"); 
+    m_window.setIcon(m_iconImage);
+
     loadWindowState();
 
     // Center the startup window
@@ -317,6 +321,10 @@ void EditorApplication::startEditor() {
     m_window.create(sf::VideoMode(m_savedWindowSize), "Riggle - 2D Skeletal Animation Tool", sf::Style::Resize | sf::Style::Titlebar | sf::Style::Close);
     m_window.setPosition(m_savedWindowPosition);
     m_window.setFramerateLimit(60);
+
+    if (m_iconLoaded) {
+        m_window.setIcon(m_iconImage);
+    }
 
     m_editorController = std::make_unique<EditorController>();
 

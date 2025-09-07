@@ -2,7 +2,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**Riggle** is a lightweight, open-source 2D skeletal animation tool built for developers, educators, and creators of interactive media. It bridges the gap between overly complex professional tools and limited basic software by offering a streamlined, intuitive animation workflow.
+**Riggle** is a lightweight 2D skeletal animation tool with a clean ImGui-based interface, designed for efficient animation workflows.
 
 ---
 
@@ -40,7 +40,11 @@ To build Riggle, ensure the following tools and libraries are installed:
 ```bash
 ./Script/build_release.bat
 ```
-These scripts will automatically build and run the project using CMake and MSVC.
+These scripts will automatically build and run the project.
+
+**OR,**
+
+**Simply open the project folder in Visual Studio. Visual Studio will automatically configure the CMake project. You can build and run the project using the built-in Build and Run options.**
 
 ---
 
@@ -71,6 +75,7 @@ This project bundles the following third-party libraries:
 - [Dear ImGui (Docking Branch)](https://github.com/ocornut/imgui/tree/docking) – MIT License ([View License](https://github.com/ocornut/imgui/blob/docking/LICENSE.txt))
 - [ImGui-SFML](https://github.com/SFML/imgui-sfml) (modified) – MIT License ([View License](https://github.com/SFML/imgui-sfml/blob/master/LICENSE))
 - [SFML 3.0](https://www.sfml-dev.org/) – zlib/libpng License ([View License](https://github.com/SFML/SFML/blob/master/license.md))
+- [nlohmann/json](https://github.com/nlohmann/json) - MIT License ([View License](https://github.com/nlohmann/json/blob/develop/LICENSE.MIT))
 - [miniz](https://github.com/richgel999/miniz) – MIT License ([View License](https://github.com/richgel999/miniz/blob/master/LICENSE))
 
 All included third-party libraries retain their original licenses and are credited to their respective authors.

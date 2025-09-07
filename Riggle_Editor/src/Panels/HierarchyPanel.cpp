@@ -91,7 +91,7 @@ void HierarchyPanel::renderBoneNode(std::shared_ptr<Bone> bone, int depth) {
     std::string popupId = "BoneContextMenu##" + std::to_string(reinterpret_cast<uintptr_t>(bone.get()));
     
     // Node flags
-    ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick;
+    ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick | ImGuiTreeNodeFlags_DefaultOpen;
     
     // Highlight selected bone
     bool isSelected = (bone == m_selectedBone);
@@ -145,6 +145,14 @@ void HierarchyPanel::renderBoneNode(std::shared_ptr<Bone> bone, int depth) {
 }
 
 void HierarchyPanel::renderContextMenu(const std::string& popupId) {
+    // If bone was deleted, close popup and reset state
+    if (!m_contextMenuBone) {
+        m_showContextMenu = false;
+        m_contextMenuPopupId.clear();
+        ImGui::CloseCurrentPopup();
+        return;
+    }
+
     if (ImGui::BeginPopup(popupId.c_str())) {
         if (m_contextMenuBone) {
             ImGui::Text("Bone: %s", m_contextMenuBone->getName().c_str());
@@ -167,6 +175,8 @@ void HierarchyPanel::renderContextMenu(const std::string& popupId) {
             
             if (ImGui::MenuItem("Delete", "Del", false, !m_contextMenuBone->isRoot())) {
                 deleteBone(m_contextMenuBone);
+                ImGui::EndPopup();
+                return;
             }
             
             if(!m_contextMenuBone->getChildren().empty()){

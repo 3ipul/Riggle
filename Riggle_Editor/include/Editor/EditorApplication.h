@@ -25,6 +25,8 @@ private:
 
     sf::Texture m_logoTexture;
     bool m_logoLoaded = false;
+    sf::Image m_iconImage;
+    bool m_iconLoaded = false;
 
     sf::Vector2u m_savedWindowSize;
     sf::Vector2i m_savedWindowPosition;

@@ -1,6 +1,5 @@
 #include "Riggle/Character.h"
 #include <algorithm>
-#include <iostream>
 
 namespace Riggle {
 
@@ -69,7 +68,6 @@ void Character::removeSprite(Sprite* sprite) {
         if (m_autoUpdate) {
             updateDeformations();
         }
-        std::cout << "Removed sprite: " << sprite->getName() << std::endl;
     }
 }
 
@@ -80,7 +78,6 @@ void Character::removeSpriteAt(size_t index) {
         if (m_autoUpdate) {
             updateDeformations();
         }
-        std::cout << "Removed sprite at index " << index << ": " << name << std::endl;
     }
 }
 
@@ -175,13 +172,6 @@ void Character::updateDeformations() {
     
    // Update all bone world transforms first
     m_rig->forceUpdateWorldTransforms();
-    
-    // Update all sprites based on their bone bindings
-    for (auto& sprite : m_sprites) {
-        if (sprite->isBoundToBone()) {
-            sprite->updateFromBone();  // CHANGED: was updateDeformation()
-        }
-    }
 }
 
 void Character::forceUpdateDeformations() {

@@ -1,6 +1,5 @@
 #include "Riggle/Sprite.h"
 #include "Riggle/Bone.h"
-#include <iostream>
 #include <cmath>
 
 namespace Riggle {
@@ -52,15 +51,12 @@ Transform Sprite::getWorldTransform() const {
 }
 
 void Sprite::bindToBone(std::shared_ptr<Bone> bone, const Vector2& offset, float rotation) {
-    if (!bone) {
-        std::cout << "Warning: Attempting to bind sprite to null bone" << std::endl;
+    if (!bone)
         return;
-    }
     
     // Unbind from previous bone if any
-    if (m_binding.bone) {
+    if (m_binding.bone)
         unbindFromBone();
-    }
     
     // Set new binding
     m_binding.bone = bone;
@@ -81,8 +77,6 @@ void Sprite::bindToBone(std::shared_ptr<Bone> bone, const Vector2& offset, float
     
     // Add this sprite to the bone's sprite list
     bone->addBoundSprite(shared_from_this());
-    
-    std::cout << "Bound sprite '" << m_name << "' to bone '" << bone->getName() << "'" << std::endl;
 }
 
 void Sprite::unbindFromBone() {
@@ -91,20 +85,11 @@ void Sprite::unbindFromBone() {
     // Remove this sprite from the bone's list
     m_binding.bone->removeBoundSprite(shared_from_this());
     
-    std::cout << "Unbound sprite '" << m_name << "' from bone '" << m_binding.bone->getName() << "'" << std::endl;
-    
     // Clear binding
     m_binding.bone = nullptr;
     m_binding.weight = 0.0f;
     m_binding.bindOffset = {0, 0};
     m_binding.bindRotation = 0.0f;
-}
-
-void Sprite::updateFromBone() {
-    if (!isBoundToBone()) return;
-    
-    // The world transform is automatically calculated in getWorldTransform()
-    // This method can be used for additional update logic if needed
 }
 
 void Sprite::restoreBinding(std::shared_ptr<Bone> bone, const Vector2& localOffset, float localRotation) {

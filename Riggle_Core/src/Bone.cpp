@@ -3,7 +3,6 @@
 #include "Riggle/Character.h"
 #include <algorithm>
 #include <functional>
-#include <iostream>
 #include <cmath>
 
 namespace Riggle {
@@ -115,8 +114,6 @@ void Bone::addChild(std::shared_ptr<Bone> child) {
     m_children.push_back(child);
     child->setParent(shared_from_this());
     child->markWorldTransformDirty();
-    
-    std::cout << "Added child bone '" << child->getName() << "' to '" << m_name << "'" << std::endl;
 }
 
 void Bone::removeChild(std::shared_ptr<Bone> child) {
@@ -124,7 +121,6 @@ void Bone::removeChild(std::shared_ptr<Bone> child) {
     if (it != m_children.end()) {
         (*it)->setParent(nullptr);
         m_children.erase(it);
-        std::cout << "Removed child bone '" << child->getName() << "' from '" << m_name << "'" << std::endl;
     }
 }
 
@@ -147,7 +143,6 @@ void Bone::addBoundSprite(std::weak_ptr<Sprite> sprite) {
     
     // Add new sprite
     m_boundSprites.push_back(sprite);
-    std::cout << "Bone '" << m_name << "' now controls " << getSpriteCount() << " sprite(s)" << std::endl;
 }
 
 void Bone::removeBoundSprite(std::weak_ptr<Sprite> sprite) {
@@ -161,8 +156,6 @@ void Bone::removeBoundSprite(std::weak_ptr<Sprite> sprite) {
             ++it;
         }
     }
-    
-    std::cout << "Bone '" << m_name << "' now controls " << getSpriteCount() << " sprite(s)" << std::endl;
 }
 
 bool Bone::hasSprites() const {

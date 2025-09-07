@@ -90,7 +90,6 @@ if(WIN32)
 
     # Hide console window on Windows Release builds
     target_link_options(Riggle_Editor PRIVATE
-        $<$<CONFIG:Debug>:/PDBALTPATH:${SFML_LIB_DIR}/Debug>
         $<$<CONFIG:Release>:/SUBSYSTEM:WINDOWS>
         $<$<CONFIG:Release>:/ENTRY:mainCRTStartup>
     )
