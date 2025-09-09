@@ -61,7 +61,7 @@ std::vector<ExportBone> ExportService::extractBoneData(const Rig& rig) {
     return bones;
 }
 
-std::vector<ExportSprite> ExportService::extractSpriteData(const std::vector<std::unique_ptr<Sprite>>& sprites) {
+std::vector<ExportSprite> ExportService::extractSpriteData(const std::vector<std::shared_ptr<Sprite>>& sprites) {
     std::vector<ExportSprite> exportSprites;
     exportSprites.reserve(sprites.size());
     

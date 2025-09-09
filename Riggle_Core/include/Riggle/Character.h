@@ -41,15 +41,15 @@ public:
     void setName(const std::string& name) { m_name = name; }
 
     // Sprite management
-    void addSprite(std::unique_ptr<Sprite> sprite);
+    void addSprite(std::shared_ptr<Sprite> sprite);
     void removeSprite(const std::string& name);
     Sprite* findSprite(const std::string& name);
     void removeSprite(Sprite* sprite); // Remove by pointer
     void removeSpriteAt(size_t index); // Remove by index
-    const std::vector<std::unique_ptr<Sprite>>& getSprites() const { return m_sprites; }
+    const std::vector<std::shared_ptr<Sprite>>& getSprites() const { return m_sprites; }
 
     // Non-const access for reordering
-    std::vector<std::unique_ptr<Sprite>>& getSprites() { return m_sprites; }
+    std::vector<std::shared_ptr<Sprite>>& getSprites() { return m_sprites; }
 
     // Rig management
     void setRig(std::unique_ptr<Rig> rig);
@@ -87,7 +87,7 @@ public:
 
 private:
     std::string m_name;
-    std::vector<std::unique_ptr<Sprite>> m_sprites;
+    std::vector<std::shared_ptr<Sprite>> m_sprites;
     std::unique_ptr<Rig> m_rig;
     std::vector<std::unique_ptr<Animation>> m_animations;
     std::vector<TransformEventHandler> m_transformHandlers;

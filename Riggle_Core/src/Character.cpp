@@ -32,7 +32,7 @@ float Character::getCurrentTime() const {
     return duration.count() / 1000.0f;
 }
 
-void Character::addSprite(std::unique_ptr<Sprite> sprite) {
+void Character::addSprite(std::shared_ptr<Sprite> sprite) {
     if (sprite) {
         m_sprites.push_back(std::move(sprite));
         if (m_autoUpdate) {
@@ -43,7 +43,7 @@ void Character::addSprite(std::unique_ptr<Sprite> sprite) {
 
 void Character::removeSprite(const std::string& name) {
     auto it = std::remove_if(m_sprites.begin(), m_sprites.end(),
-        [&name](const std::unique_ptr<Sprite>& sprite) {
+        [&name](const std::shared_ptr<Sprite>& sprite) {
             return sprite->getName() == name;
         });
     
@@ -59,7 +59,7 @@ void Character::removeSprite(Sprite* sprite) {
     if (!sprite) return;
     
     auto it = std::remove_if(m_sprites.begin(), m_sprites.end(),
-        [sprite](const std::unique_ptr<Sprite>& spr) {
+        [sprite](const std::shared_ptr<Sprite>& spr) {
             return spr.get() == sprite;
         });
     
@@ -83,7 +83,7 @@ void Character::removeSpriteAt(size_t index) {
 
 Sprite* Character::findSprite(const std::string& name) {
     auto it = std::find_if(m_sprites.begin(), m_sprites.end(),
-        [&name](const std::unique_ptr<Sprite>& sprite) {
+        [&name](const std::shared_ptr<Sprite>& sprite) {
             return sprite->getName() == name;
         });
     

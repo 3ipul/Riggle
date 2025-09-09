@@ -408,11 +408,8 @@ bool ProjectManager::reconstructSprites(const json& spritesJson, Character* char
                     }
                 }
 
-                // Convert shared_ptr to unique_ptr for adding to character
-                auto uniqueSprite = std::make_unique<Sprite>(*sprite); // Copy construct
-
                 // Add sprite to character
-                character->addSprite(std::move(uniqueSprite));
+                character->addSprite(sprite);
 
                 // After adding, re-bind the actual stored sprite if needed
                 if (!boundBoneName.empty()) {

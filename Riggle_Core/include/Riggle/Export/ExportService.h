@@ -13,7 +13,7 @@ public:
     static ExportProject extractProjectData(const Character& character, const std::string& projectName = "Untitled");
     static ExportAnimation extractAnimationData(const Animation& animation);
     static std::vector<ExportBone> extractBoneData(const Rig& rig);
-    static std::vector<ExportSprite> extractSpriteData(const std::vector<std::unique_ptr<Sprite>>& sprites);
+    static std::vector<ExportSprite> extractSpriteData(const std::vector<std::shared_ptr<Sprite>>& sprites);
 
 private:
     static ExportBone convertBone(std::shared_ptr<Bone> bone);
