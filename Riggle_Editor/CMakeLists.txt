@@ -43,6 +43,7 @@ add_executable(Riggle_Editor
     src/Export/JSONExporter.cpp
     src/Export/PNGExporter.cpp
     src/Utils/AssetManager.cpp
+    src/Utils/DialogManager.cpp
     src/Utils/FileDialogManager.cpp
     src/Utils/miniz.c
     src/Project/ProjectManager.cpp

@@ -15,21 +15,14 @@ EditorController::EditorController()
     , m_hierarchyPanel(nullptr)
     , m_propertyPanel(nullptr)
     , m_currentWindow(nullptr)
-    , m_showExitConfirmation(false)
     , m_shouldExit(false)
     , m_hasUnsavedChanges(false)
-    , m_showExportDialog(false)
-    , m_selectedProjectExporter(0)
-    , m_selectedAnimationExporter(0)
-    , m_exportProject(true)
-    , m_outputPath("")
-    , m_projectName("MyProject")
-    , m_showResetLayoutConfirmation(false)
     , m_resetLayoutRequested(false)
 {
     initializePanels();
     initializeExportSystem();
     initializeProjectSystem();
+    setupDialogCallbacks();
 }
 
 void EditorController::update(sf::RenderWindow& window) {
@@ -80,12 +73,9 @@ void EditorController::render(sf::RenderWindow& window) {
     }
 
     // Render dialogs
-    renderExportDialog();
-    renderProjectSettingsDialog();
-    renderExitConfirmation();
-    renderControlsDialog();
-    renderAboutDialog();
-    renderLayoutResetConfirmationDialog();
+    if (m_dialogManager) {
+        m_dialogManager->render();
+    }
 }
 
 void EditorController::handleEvent(const sf::Event& event) {
@@ -535,7 +525,11 @@ void EditorController::renderMainMenuBar() {
     if (ImGui::BeginMainMenuBar()) {
         if (ImGui::BeginMenu("File")) {
             if (ImGui::MenuItem("New Project")) {
-                newProject();
+                if (hasUnsavedChanges()) {
+                    m_dialogManager->showNewProjectConfirmation(true);
+                } else {
+                    newProject();
+                }
             }
             if (ImGui::MenuItem("Save Project")) {
                 saveProject();
@@ -544,11 +538,13 @@ void EditorController::renderMainMenuBar() {
                 loadProject();
             }
             if (ImGui::MenuItem("Project Settings...")) {
-                m_showProjectSettingsDialog = true;
+                //m_showProjectSettingsDialog = true;
+                m_dialogManager->showProjectSettingsDialog(m_currentProjectMetadata);
             }
             ImGui::Separator();
             if (ImGui::MenuItem("Export...")) {
-                m_showExportDialog = true;
+                //m_showExportDialog = true;
+                m_dialogManager->showExportDialog(m_character.get());
             }
             ImGui::Separator();
             if (ImGui::MenuItem("Exit")) {
@@ -569,7 +565,7 @@ void EditorController::renderMainMenuBar() {
             ImGui::Separator();
             if (ImGui::MenuItem("Reset Layout")) {
                 // Reset all panels to visible
-                m_showResetLayoutConfirmation = true;
+                m_dialogManager->showLayoutResetConfirmation();
             }
             ImGui::Separator();
             if (ImGui::MenuItem("Reset View")) {
@@ -598,10 +594,12 @@ void EditorController::renderMainMenuBar() {
         
         if (ImGui::BeginMenu("Help")) {
             if (ImGui::MenuItem("Controls")) {
-                m_showControlsDialog = true; // Set flag instead of cout
+                //m_showControlsDialog = true;
+                m_dialogManager->showControlsDialog();
             }
             if (ImGui::MenuItem("About Riggle")) {
-                m_showAboutDialog = true; // Set flag instead of cout
+                //m_showAboutDialog = true;
+                m_dialogManager->showAboutDialog();
             }
             ImGui::EndMenu();
         }
@@ -618,6 +616,11 @@ void EditorController::renderMainMenuBar() {
         }
         
         ImGui::EndMainMenuBar();
+    }
+    // Handle new project confirmation after rendering dialogs
+    if (m_dialogManager && m_dialogManager->isNewProjectConfirmed()) {
+        newProject();
+        m_dialogManager->clearNewProjectConfirmedFlag();
     }
 }
 
@@ -646,73 +649,23 @@ void EditorController::onBoneDeleted(std::shared_ptr<Bone> bone) {
 }
 
 void EditorController::requestExit() {
-    if (hasUnsavedChanges()) {
-        m_showExitConfirmation = true;
-    } else {
-        m_shouldExit = true;
+    if (m_dialogManager) {
+        m_dialogManager->showExitConfirmation(hasUnsavedChanges());
     }
 }
 
-void EditorController::renderExitConfirmation() {
-    if (m_showExitConfirmation) {
-        ImGui::OpenPopup("Exit Riggle");
+bool EditorController::shouldExit() const { 
+    if (m_dialogManager && m_dialogManager->shouldExit()) {
+        return true;
     }
-    
-    // Center the popup
-    ImVec2 center = ImGui::GetMainViewport()->GetCenter();
-    ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-    
-    if (ImGui::BeginPopupModal("Exit Riggle", nullptr, 
-                               ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove)) {
-        
-        ImGui::Text("Are you sure you want to exit Riggle?");
-        
-        bool hasChanges = hasUnsavedChanges();
-        if (hasChanges) {
-            ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.0f, 1.0f), "You have unsaved changes!");
-            ImGui::Text("Your work will be lost if you exit without saving.");
-        }
-        
-        ImGui::Separator();
-        ImGui::Spacing();
-        
-        // Button layout
-        float buttonWidth = 120.0f;
-        float spacing = ImGui::GetStyle().ItemSpacing.x;
-        float totalWidth = hasUnsavedChanges() ? (buttonWidth * 3 + spacing * 2) : (buttonWidth * 2 + spacing);
-        float startPos = (ImGui::GetContentRegionAvail().x - totalWidth) * 0.5f;
-        
-        if (startPos > 0) {
-            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + startPos);
-        }
-        
-        if (hasChanges) {
-            // Save and Exit button
-            if (ImGui::Button("Save & Exit", ImVec2(buttonWidth, 0))) {
-                saveProject();
-                m_shouldExit = true;
-                m_showExitConfirmation = false;
-                ImGui::CloseCurrentPopup();
-            }
-            ImGui::SameLine();
-        }
-        
-        // Exit without saving
-        if (ImGui::Button("Exit", ImVec2(buttonWidth, 0))) {
-            m_shouldExit = true;
-            m_showExitConfirmation = false;
-            ImGui::CloseCurrentPopup();
-        }
-        ImGui::SameLine();
-        
-        // Cancel
-        if (ImGui::Button("Cancel", ImVec2(buttonWidth, 0))) {
-            m_showExitConfirmation = false;
-            ImGui::CloseCurrentPopup();
-        }
-        
-        ImGui::EndPopup();
+    return m_shouldExit; 
+}
+
+bool EditorController::isLayoutResetRequested() const { 
+    if (m_dialogManager && m_dialogManager->isLayoutResetRequested()) {
+        return true;
     }
+    return m_resetLayoutRequested; 
 }
 
 bool EditorController::hasUnsavedChanges() const {
@@ -744,14 +697,10 @@ void EditorController::newProject() {
         std::cout << "Warning: You have unsaved changes!" << std::endl;
     }
 
-    // Update dialog buffers
-    strncpy(m_projectSettingsName, m_currentProjectMetadata.name.c_str(), sizeof(m_projectSettingsName) - 1);
-    m_projectSettingsName[sizeof(m_projectSettingsName) - 1] = '\0';
-    strncpy(m_projectSettingsAuthor, m_currentProjectMetadata.author.c_str(), sizeof(m_projectSettingsAuthor) - 1);
-    m_projectSettingsAuthor[sizeof(m_projectSettingsAuthor) - 1] = '\0';
-    strncpy(m_projectSettingsDescription, m_currentProjectMetadata.description.c_str(), sizeof(m_projectSettingsDescription) - 1);
-    m_projectSettingsDescription[sizeof(m_projectSettingsDescription) - 1] = '\0';
-    m_projectSettingsDialogInitialized = true;
+    // Update dialog manager with current project metadata
+    if (m_dialogManager) {
+        m_dialogManager->updateProjectMetadata(m_currentProjectMetadata);
+    }
     
     // Create new character
     createDefaultCharacter();
@@ -836,14 +785,10 @@ void EditorController::loadProject() {
             m_currentProjectPath = filePath;
             m_currentProjectMetadata = metadata;
 
-            // Update dialog buffers
-            strncpy(m_projectSettingsName, metadata.name.c_str(), sizeof(m_projectSettingsName) - 1);
-            m_projectSettingsName[sizeof(m_projectSettingsName) - 1] = '\0';
-            strncpy(m_projectSettingsAuthor, metadata.author.c_str(), sizeof(m_projectSettingsAuthor) - 1);
-            m_projectSettingsAuthor[sizeof(m_projectSettingsAuthor) - 1] = '\0';
-            strncpy(m_projectSettingsDescription, metadata.description.c_str(), sizeof(m_projectSettingsDescription) - 1);
-            m_projectSettingsDescription[sizeof(m_projectSettingsDescription) - 1] = '\0';
-            m_projectSettingsDialogInitialized = true;
+            // Update dialog manager with loaded project metadata
+            if (m_dialogManager) {
+                m_dialogManager->updateProjectMetadata(metadata);
+            }
             
             // Update all panels with loaded character
             updateAllPanelsWithCharacter();
@@ -870,480 +815,49 @@ void EditorController::updateAllPanelsWithCharacter() {
     setupPanelCallbacks();
 }
 
-void EditorController::renderProjectSettingsDialog() {
-    if (!m_showProjectSettingsDialog) return;
-
-    if (!ImGui::IsPopupOpen("Project Settings")) {
-        ImGui::OpenPopup("Project Settings");
-    }
-
-    ImVec2 center = ImGui::GetMainViewport()->GetCenter();
-    ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-    ImGui::SetNextWindowSize(ImVec2(400, 300), ImGuiCond_FirstUseEver);
-
-    if (ImGui::BeginPopupModal("Project Settings", &m_showProjectSettingsDialog)) {
-        // Initialize with current values if not already done
-        if (!m_projectSettingsDialogInitialized) {
-            strncpy(m_projectSettingsName, m_currentProjectMetadata.name.c_str(), sizeof(m_projectSettingsName) - 1);
-            m_projectSettingsName[sizeof(m_projectSettingsName) - 1] = '\0';
-            strncpy(m_projectSettingsAuthor, m_currentProjectMetadata.author.c_str(), sizeof(m_projectSettingsAuthor) - 1);
-            m_projectSettingsAuthor[sizeof(m_projectSettingsAuthor) - 1] = '\0';
-            strncpy(m_projectSettingsDescription, m_currentProjectMetadata.description.c_str(), sizeof(m_projectSettingsDescription) - 1);
-            m_projectSettingsDescription[sizeof(m_projectSettingsDescription) - 1] = '\0';
-            m_projectSettingsDialogInitialized = true;
+void EditorController::setupDialogCallbacks() {
+    if (!m_dialogManager) return;
+    
+    m_dialogManager->setOnSaveAndExit([this]() {
+        saveProject();
+    });
+    
+    m_dialogManager->setOnExit([this]() {
+        // Just set the flag, actual exit is handled by shouldExit()
+    });
+    
+    m_dialogManager->setOnLayoutReset([this]() {
+        for (auto& panel : m_panels) {
+            if (panel) {
+                panel->setVisible(true);
+            }
         }
+        m_resetLayoutRequested = true;
+    });
+    
+    m_dialogManager->setOnProjectSettingsSave([this](const ProjectMetadata& metadata) {
+        m_currentProjectMetadata = metadata;
+        m_hasUnsavedChanges = true;
 
-        ImGui::Text("Project Information:");
-        ImGui::Separator();
-
-        ImGui::InputText("Project Name", m_projectSettingsName, sizeof(m_projectSettingsName));
-        ImGui::InputText("Author", m_projectSettingsAuthor, sizeof(m_projectSettingsAuthor));
-        ImGui::InputTextMultiline("Description", m_projectSettingsDescription, sizeof(m_projectSettingsDescription), ImVec2(0, 100));
-
-        ImGui::Separator();
-        ImGui::Text("Created: %s", m_currentProjectMetadata.createdDate.c_str());
-        ImGui::Text("Modified: %s", m_currentProjectMetadata.modifiedDate.c_str());
-
-        ImGui::Separator();
-
-        if (ImGui::Button("Save")) {
-            m_currentProjectMetadata.name = m_projectSettingsName;
-            m_currentProjectMetadata.author = m_projectSettingsAuthor;
-            m_currentProjectMetadata.description = m_projectSettingsDescription;
-            m_hasUnsavedChanges = true;
-            m_showProjectSettingsDialog = false;
-            m_projectSettingsDialogInitialized = false;
+        // Keep dialog manager in sync
+        if (m_dialogManager) {
+            m_dialogManager->updateProjectMetadata(metadata);
         }
-
-        ImGui::SameLine();
-        if (ImGui::Button("Cancel")) {
-            m_showProjectSettingsDialog = false;
-            m_projectSettingsDialogInitialized = false;
-        }
-
-        ImGui::EndPopup();
-    }
+    });
 }
 
 void EditorController::initializeExportSystem() {
     m_exportManager = std::make_unique<ExportManager>();
+    m_dialogManager = std::make_unique<DialogManager>();
     
     // Register built-in exporters
     m_exportManager->registerProjectExporter(std::make_unique<JSONProjectExporter>());
     m_exportManager->registerAnimationExporter(std::make_unique<PNGSequenceExporter>());
     
+    // Initialize dialog manager with dependencies
+    m_dialogManager->initialize(m_exportManager.get(), m_projectManager.get());
+    
     std::cout << "Export system initialized" << std::endl;
-}
-
-void EditorController::renderExportDialog() {
-    if (!m_showExportDialog) return;
-
-    // Open the popup immediately when flag is set
-    if (!ImGui::IsPopupOpen("Export")) {
-        ImGui::OpenPopup("Export");
-    }
-    
-    // Center the dialog
-    ImVec2 center = ImGui::GetMainViewport()->GetCenter();
-    ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-    ImGui::SetNextWindowSize(ImVec2(600, 400), ImGuiCond_FirstUseEver);
-    
-    if (ImGui::BeginPopupModal("Export", &m_showExportDialog, ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::Text("Export JSON data or PNG image sequence");
-        ImGui::Separator();
-        
-        // Export type selection
-        if (ImGui::RadioButton("Export JSON", m_exportProject)) {
-            m_exportProject = true;
-        }
-        ImGui::SameLine();
-        if (ImGui::RadioButton("Export PNG sequence", !m_exportProject)) {
-            m_exportProject = false;
-        }
-        
-        ImGui::Spacing();
-        ImGui::Separator();
-        ImGui::Spacing();
-        
-        if (m_exportProject) {
-            // Project export options
-            ImGui::Text("JSON Export Settings:");
-            ImGui::InputText("Project Name", m_projectName, sizeof(m_projectName));
-            
-            auto projectExporters = m_exportManager->getProjectExporters();
-            if (!projectExporters.empty()) {
-                ImGui::Text("Export Format:");
-                for (int i = 0; i < static_cast<int>(projectExporters.size()); ++i) {
-                    bool selected = (m_selectedProjectExporter == i);
-                    if (ImGui::RadioButton(projectExporters[i]->getFormatName().c_str(), selected)) {
-                        m_selectedProjectExporter = i;
-                    }
-                    
-                    // Show file extension
-                    ImGui::SameLine();
-                    ImGui::TextDisabled("(%s)", projectExporters[i]->getFileExtension().c_str());
-                }
-            } else {
-                ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.5f, 1.0f), "No project exporters available!");
-            }
-        } else {
-            // Animation export options
-            ImGui::Text("PNG Sequence Export Settings:");
-            //ImGui::InputText("Animation Name", m_animationName, sizeof(m_animationName));
-            
-            // Resolution presets
-            static const char* resolutions[] = { "1280x720", "1920x1080", "2560x1440" };
-            static int resIdx = 1;
-            ImGui::Text("Resolution:");
-            if (ImGui::Combo("##Resolution", &resIdx, resolutions, IM_ARRAYSIZE(resolutions))) {
-                auto animationExporters = m_exportManager->getAnimationExporters();
-                if (m_selectedAnimationExporter < static_cast<int>(animationExporters.size())) {
-                    auto* pngExporter = dynamic_cast<PNGSequenceExporter*>(animationExporters[m_selectedAnimationExporter]);
-                    if (pngExporter) pngExporter->setResolutionPreset(resIdx);
-                }
-            }
-
-            // Aspect ratio presets
-            static const char* aspectRatios[] = { "16:9", "4:3", "1:1", "21:9" };
-            static int aspectIdx = 0;
-            ImGui::Text("Aspect Ratio:");
-            if (ImGui::Combo("##AspectRatio", &aspectIdx, aspectRatios, IM_ARRAYSIZE(aspectRatios))) {
-                auto animationExporters = m_exportManager->getAnimationExporters();
-                if (m_selectedAnimationExporter < static_cast<int>(animationExporters.size())) {
-                    auto* pngExporter = dynamic_cast<PNGSequenceExporter*>(animationExporters[m_selectedAnimationExporter]);
-                    if (pngExporter) pngExporter->setAspectRatioIndex(aspectIdx);
-                }
-            }
-
-            // Frame rate presets
-            static const char* fpsOptions[] = { "24", "30", "60" };
-            static int fpsIdx = 1;
-            ImGui::Text("Frame Rate:");
-            if (ImGui::Combo("##FrameRate", &fpsIdx, fpsOptions, IM_ARRAYSIZE(fpsOptions))) {
-                int fps = 24;
-                if (fpsIdx == 1) fps = 30;
-                else if (fpsIdx == 2) fps = 60;
-                auto animationExporters = m_exportManager->getAnimationExporters();
-                if (m_selectedAnimationExporter < static_cast<int>(animationExporters.size())) {
-                    auto* pngExporter = dynamic_cast<PNGSequenceExporter*>(animationExporters[m_selectedAnimationExporter]);
-                    if (pngExporter) pngExporter->setFrameRate(fps);
-                }
-            }
-
-            // Zoom slider
-            static float zoom = 1.0f;
-            ImGui::Text("Zoom:");
-            if (ImGui::SliderFloat("##Zoom", &zoom, 0.1f, 2.0f, "%.2fx")) {
-                auto animationExporters = m_exportManager->getAnimationExporters();
-                if (m_selectedAnimationExporter < static_cast<int>(animationExporters.size())) {
-                    auto* pngExporter = dynamic_cast<PNGSequenceExporter*>(animationExporters[m_selectedAnimationExporter]);
-                    if (pngExporter) pngExporter->setZoom(zoom);
-                }
-            }
-
-            // Background color picker
-            static float bgColor[4] = { 1, 1, 1, 0 }; // Default transparent
-            ImGui::Text("Background Color:");
-            if (ImGui::ColorEdit4("##BGColor", bgColor)) {
-                sf::Color color(
-                    static_cast<std::uint8_t>(bgColor[0] * 255),
-                    static_cast<std::uint8_t>(bgColor[1] * 255),
-                    static_cast<std::uint8_t>(bgColor[2] * 255),
-                    static_cast<std::uint8_t>(bgColor[3] * 255)
-                );
-                auto animationExporters = m_exportManager->getAnimationExporters();
-                if (m_selectedAnimationExporter < static_cast<int>(animationExporters.size())) {
-                    auto* pngExporter = dynamic_cast<PNGSequenceExporter*>(animationExporters[m_selectedAnimationExporter]);
-                    if (pngExporter) pngExporter->setBackgroundColor(color);
-                }
-            }
-            
-            // Show animations to select
-            if (m_character) {
-                const auto& animations = m_character->getAnimations();
-                // Resize selection vector if needed
-                if (m_exportAnimationSelections.size() != animations.size()) {
-                    m_exportAnimationSelections.assign(animations.size(), false);
-                }
-                if (animations.empty()) {
-                    ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.5f, 1.0f), "No animations available to export!");
-                } else {
-                    ImGui::Text("Select animations to export:");
-                    if (ImGui::Button("Select All")) {
-                        std::fill(m_exportAnimationSelections.begin(), m_exportAnimationSelections.end(), true);
-                    }
-                    ImGui::SameLine();
-                    if (ImGui::Button("Select None")) {
-                        std::fill(m_exportAnimationSelections.begin(), m_exportAnimationSelections.end(), false);
-                    }
-                    for (size_t i = 0; i < animations.size(); ++i) {
-                        if (animations[i]) {
-                            bool checked = m_exportAnimationSelections[i];
-                            if (ImGui::Checkbox(animations[i]->getName().c_str(), &checked)) {
-                                m_exportAnimationSelections[i] = checked ? true : false;
-                            }
-                        }
-                    }
-                }
-            }
-            
-            auto animationExporters = m_exportManager->getAnimationExporters();
-            if (!animationExporters.empty()) {
-                ImGui::Text("Export Format:");
-                for (int i = 0; i < static_cast<int>(animationExporters.size()); ++i) {
-                    bool selected = (m_selectedAnimationExporter == i);
-                    if (ImGui::RadioButton(animationExporters[i]->getFormatName().c_str(), selected)) {
-                        m_selectedAnimationExporter = i;
-                    }
-                    
-                    // Show format description
-                    ImGui::SameLine();
-                    std::string ext = animationExporters[i]->getFileExtension();
-                    if (ext.empty()) {
-                        ImGui::TextDisabled("(Directory)");
-                    } else {
-                        ImGui::TextDisabled("(%s)", ext.c_str());
-                    }
-                }
-            } else {
-                ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.5f, 1.0f), "No animation exporters available!");
-            }
-        }
-        
-        ImGui::Spacing();
-        ImGui::Separator();
-        ImGui::Spacing();
-        
-        // Output path selection
-        ImGui::Text("Output Path:");
-        ImGui::InputText("##OutputPath", m_outputPath, sizeof(m_outputPath));
-        ImGui::SameLine();
-        if (ImGui::Button("Browse...")) {
-            std::string selectedPath;
-            if (m_exportProject) {
-                // JSON export: show save file dialog with default name and .json filter
-                std::vector<FileFilter> filters = {
-                    FileFilter("JSON Files", ".json"),
-                    FileFilter("All Files", ".*")
-                };
-                std::string defaultName = std::string(m_projectName) + ".json";
-                if (FileDialogManager::getInstance().saveFileDialog(selectedPath, filters, "", defaultName)) {
-                    strncpy(m_outputPath, selectedPath.c_str(), sizeof(m_outputPath) - 1);
-                    m_outputPath[sizeof(m_outputPath) - 1] = '\0';
-                }
-            } else {
-                // PNG sequence: keep current directory dialog logic
-                bool isDirectory = false;
-                auto animationExporters = m_exportManager->getAnimationExporters();
-                if (m_selectedAnimationExporter < static_cast<int>(animationExporters.size())) {
-                    isDirectory = animationExporters[m_selectedAnimationExporter]->getFileExtension().empty();
-                }
-                if (openFileDialog(selectedPath, isDirectory)) {
-                    strncpy(m_outputPath, selectedPath.c_str(), sizeof(m_outputPath) - 1);
-                    m_outputPath[sizeof(m_outputPath) - 1] = '\0';
-                }
-            }
-        }
-        
-        // Show any export errors
-        if (!m_lastExportError.empty()) {
-            ImGui::Spacing();
-            ImGui::TextColored(ImVec4(1.0f, 0.3f, 0.3f, 1.0f), "Export Error:");
-            ImGui::TextWrapped("%s", m_lastExportError.c_str());
-        }
-        
-        ImGui::Spacing();
-        ImGui::Separator();
-        ImGui::Spacing();
-        
-        // Buttons
-        float buttonWidth = 100.0f;
-        float spacing = ImGui::GetStyle().ItemSpacing.x;
-        float totalWidth = buttonWidth * 2 + spacing;
-        float startPos = (ImGui::GetContentRegionAvail().x - totalWidth) * 0.5f;
-        
-        if (startPos > 0) {
-            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + startPos);
-        }
-        
-        // Export button
-        bool canExport = strlen(m_outputPath) > 0 && m_character;
-        if (!canExport) {
-            ImGui::BeginDisabled();
-        }
-        
-        if (ImGui::Button("Export", ImVec2(buttonWidth, 0))) {
-            performExport();
-        }
-        
-        if (!canExport) {
-            ImGui::EndDisabled();
-        }
-        
-        ImGui::SameLine();
-        
-        // Cancel button
-        if (ImGui::Button("Cancel", ImVec2(buttonWidth, 0))) {
-            m_showExportDialog = false;
-            m_lastExportError.clear();
-        }
-        
-        ImGui::EndPopup();
-    }
-}
-
-void EditorController::performExport() {
-    if (!m_character || !m_exportManager) {
-        m_lastExportError = "No character or export manager available";
-        return;
-    }
-    
-    m_lastExportError.clear();
-    bool success = false;
-    
-    try {
-        if (m_exportProject) {
-            // Export JSON data
-            auto projectExporters = m_exportManager->getProjectExporters();
-            if (m_selectedProjectExporter < static_cast<int>(projectExporters.size())) {
-                auto* exporter = projectExporters[m_selectedProjectExporter];
-
-                // Build output path
-                std::string outputPath = m_outputPath;
-                std::string extension = exporter->getFileExtension();
-                std::string projectNameStr = m_projectName;
-                if (outputPath.empty()) {
-                    m_lastExportError = "Please specify an output path.";
-                    return;
-                }
-                // If outputPath is a directory, append project name
-                if (outputPath.back() == '/' || outputPath.back() == '\\' || 
-                    (outputPath.find('.') == std::string::npos)) {
-                    outputPath += projectNameStr;
-                }
-                // Ensure .json extension
-                if (!extension.empty() && outputPath.find(extension) == std::string::npos) {
-                    outputPath += extension;
-                }
-
-                success = m_exportManager->exportProject(*m_character, projectNameStr, exporter, outputPath);
-
-                if (success) {
-                    std::cout << "Project exported successfully to: " << outputPath << std::endl;
-                    m_showExportDialog = false;
-                } else {
-                    m_lastExportError = m_exportManager->getLastError();
-                }
-            } else {
-                m_lastExportError = "Invalid project exporter selected";
-            }
-        } else {
-            // Export animations
-            auto animationExporters = m_exportManager->getAnimationExporters();
-            if (m_selectedAnimationExporter < static_cast<int>(animationExporters.size())) {
-                auto* exporter = animationExporters[m_selectedAnimationExporter];
-
-                const auto& animations = m_character->getAnimations();
-                bool anyExported = false;
-                for (size_t i = 0; i < m_exportAnimationSelections.size(); ++i) {
-                    if (m_exportAnimationSelections[i] && animations[i]) {
-                        std::string animName = animations[i]->getName();
-                        std::string animationFolder = std::string(m_outputPath) + "/" + animName;
-                        bool ok = m_exportManager->exportAnimation(*m_character, animName, exporter, animationFolder);
-                        if (ok) {
-                            std::cout << "Animation exported successfully to: " << animationFolder << std::endl;
-                            anyExported = true;
-                        } else {
-                            m_lastExportError += m_exportManager->getLastError() + "\n";
-                        }
-                    }
-                }
-                if (anyExported) {
-                    m_showExportDialog = false;
-                }
-                if (!anyExported && m_lastExportError.empty()) {
-                    m_lastExportError = "No animations selected for export";
-                }
-            }
-        }
-    }
-    catch (const std::exception& e) {
-        m_lastExportError = "Exception during export: " + std::string(e.what());
-    }
-}
-
-bool EditorController::openFileDialog(std::string& selectedPath, bool isDirectory) {
-    if (isDirectory) {
-        return FileDialogManager::getInstance().directoryDialog(selectedPath, "Select Export Directory");
-    } else {
-        std::vector<FileFilter> filters = {
-            FileFilter("All Files", ".*")
-        };
-        return FileDialogManager::getInstance().openFileDialog(selectedPath, filters);
-    }
-}
-
-void EditorController::renderControlsDialog() {
-    if (!m_showControlsDialog) return;
-    
-    if (!ImGui::IsPopupOpen("Controls")) {
-        ImGui::OpenPopup("Controls");
-    }
-    
-    ImVec2 center = ImGui::GetMainViewport()->GetCenter();
-    ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-    ImGui::SetNextWindowSize(ImVec2(500, 400), ImGuiCond_FirstUseEver);
-    
-    if (ImGui::BeginPopupModal("Controls", &m_showControlsDialog)) {
-        ImGui::Text("Riggle Controls:");
-        ImGui::Separator();
-        
-        ImGui::Text("Mouse Controls:");
-        ImGui::BulletText("Left click: Select sprite/bone");
-        ImGui::BulletText("Left drag: Move unbound sprite");
-        ImGui::BulletText("Right/Middle drag: Pan view");
-        ImGui::BulletText("Mouse wheel: Zoom in/out");
-        
-        ImGui::Spacing();
-        ImGui::Text("Keyboard Shortcuts:");
-        ImGui::BulletText("1: Sprite Tool");
-        ImGui::BulletText("2: Bone Tool");
-        ImGui::BulletText("ESC: Exit application");
-        
-        ImGui::Spacing();
-        if (ImGui::Button("Close")) {
-            m_showControlsDialog = false;
-        }
-        
-        ImGui::EndPopup();
-    }
-}
-
-void EditorController::renderAboutDialog() {
-    if (!m_showAboutDialog) return;
-    
-    if (!ImGui::IsPopupOpen("About Riggle")) {
-        ImGui::OpenPopup("About Riggle");
-    }
-    
-    ImVec2 center = ImGui::GetMainViewport()->GetCenter();
-    ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-    
-    if (ImGui::BeginPopupModal("About Riggle", &m_showAboutDialog, ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::Text("Riggle 2D Animation Tool");
-        ImGui::Separator();
-        ImGui::Text("Developed By:");
-        ImGui::BulletText("Bipul Gautam");
-        ImGui::BulletText("Bishal Khatiwada");
-        ImGui::BulletText("Bishal Rimal");
-        
-        ImGui::Spacing();
-        if (ImGui::Button("Close")) {
-            m_showAboutDialog = false;
-        }
-        
-        ImGui::EndPopup();
-    }
 }
 
 void EditorController::setupInitialDockLayout(ImGuiID dockspace_id) {
@@ -1373,39 +887,6 @@ void EditorController::setupInitialDockLayout(ImGuiID dockspace_id) {
     ImGui::DockBuilderDockWindow("Animation", dock_id_bottom);
 
     ImGui::DockBuilderFinish(dockspace_id);
-}
-
-void EditorController::renderLayoutResetConfirmationDialog() {
-    if (m_showResetLayoutConfirmation) {
-    ImGui::OpenPopup("Reset Layout?");
-    }
-
-    // Center the popup
-    ImVec2 center = ImGui::GetMainViewport()->GetCenter();
-    ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-
-    if (ImGui::BeginPopupModal("Reset Layout?", &m_showResetLayoutConfirmation, ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::Spacing();
-        ImGui::Text("Are you sure you want to reset the panel layout?");
-        ImGui::Spacing();
-
-        if (ImGui::Button("Yes")) {
-            for (auto& panel : m_panels) {
-                if (panel) {
-                    panel->setVisible(true);
-                }
-            }
-            m_resetLayoutRequested = true;
-            m_showResetLayoutConfirmation = false;
-            ImGui::CloseCurrentPopup();
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("No")) {
-            m_showResetLayoutConfirmation = false;
-            ImGui::CloseCurrentPopup();
-        }
-        ImGui::EndPopup();
-    }
 }
 
 } // namespace Riggle

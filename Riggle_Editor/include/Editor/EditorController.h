@@ -9,6 +9,7 @@
 #include "Panels/AnimationPanel.h"
 #include "Export/ExportManager.h"
 #include "Editor/Utils/FileDialogManager.h"
+#include "Editor/Utils/DialogManager.h"
 #include "Editor/Project/ProjectManager.h"
 #include <Riggle/Character.h>
 #include <memory>
@@ -27,7 +28,7 @@ public:
 
     // Exit handling
     void requestExit();
-    bool shouldExit() const { return m_shouldExit; }
+    bool shouldExit() const;
     
     // Panel access
     ViewportPanel* getViewportPanel() const { return m_viewportPanel; }
@@ -42,7 +43,7 @@ public:
 
     // Layout management
     void setupInitialDockLayout(ImGuiID dockspace_id);
-    bool isLayoutResetRequested() const { return m_resetLayoutRequested; }
+    bool isLayoutResetRequested() const;
     void requestLayoutReset() { m_resetLayoutRequested = true; }
     void clearLayoutResetRequest() { m_resetLayoutRequested = false; }
 
@@ -60,34 +61,18 @@ private:
     std::unique_ptr<ProjectManager> m_projectManager;
     std::string m_currentProjectPath;
     ProjectMetadata m_currentProjectMetadata;
-
-    char m_projectSettingsName[256] = {};
-    char m_projectSettingsAuthor[256] = {};
-    char m_projectSettingsDescription[512] = {};
-    bool m_projectSettingsDialogInitialized = false;
     
     // Character
     std::unique_ptr<Character> m_character;
     
     // State
     sf::RenderWindow* m_currentWindow;
-    bool m_showExitConfirmation = false;
     bool m_shouldExit = false;          
     bool m_hasUnsavedChanges = false;
-    bool m_showControlsDialog = false;
-    bool m_showAboutDialog = false;
-    bool m_showProjectSettingsDialog = false;
 
-    // Export dialog state
+    // Export and dialog management
     std::unique_ptr<ExportManager> m_exportManager;
-    bool m_showExportDialog;
-    int m_selectedProjectExporter;
-    int m_selectedAnimationExporter;
-    bool m_exportProject; // true for project, false for animation
-    char m_outputPath[512];
-    char m_projectName[256];
-    std::string m_lastExportError;
-    std::vector<bool> m_exportAnimationSelections;
+    std::unique_ptr<DialogManager> m_dialogManager;
     
     // Initialization
     void initializePanels();
@@ -114,13 +99,8 @@ private:
     
     // Rendering
     void renderMainMenuBar();
-    void renderExitConfirmation();
-    void renderControlsDialog();
-    void renderAboutDialog();
-    void renderProjectSettingsDialog();
 
-    void renderLayoutResetConfirmationDialog();
-    bool m_showResetLayoutConfirmation = false;
+    // Layout management
     bool m_resetLayoutRequested = false;
 
     // Project management
@@ -133,9 +113,9 @@ private:
     
     // Export methods
     void initializeExportSystem();
-    void renderExportDialog();
-    void performExport();
-    bool openFileDialog(std::string& selectedPath, bool isDirectory = false);
+    
+    // Dialog callbacks
+    void setupDialogCallbacks();
 };
 
 } // namespace Riggle
