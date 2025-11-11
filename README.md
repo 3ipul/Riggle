@@ -79,3 +79,11 @@ This project bundles the following third-party libraries:
 - [miniz](https://github.com/richgel999/miniz) – MIT License ([View License](https://github.com/richgel999/miniz/blob/master/LICENSE))
 
 All included third-party libraries retain their original licenses and are credited to their respective authors.
+
+---
+
+## Screenshots
+![Screenshot 1. Application Interface](screenshots/Screenshot_1.png)
+![Screenshot 2. Importing Character Parts](screenshots/Screenshot_2.png)
+![Screenshot 3. Animating the Character](screenshots/Screenshot_3.png)
+![Screenshot 4. Export Dialog](screenshots/Screenshot_4.png)
